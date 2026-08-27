@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
 import { amplitudeToDbfs, isClipped, peakDbfs } from "../../src/lib/audio/level.ts";
-import { trimSilence } from "../../src/lib/audio/trim-silence.ts";
+import { normalizePeak, removeDcOffset } from "../../src/lib/audio/normalize.ts";
+import { analyzeTake, trimSilence } from "../../src/lib/audio/trim-silence.ts";
 
 const SAMPLE_RATE = 1000;
 const OPTIONS = { sampleRate: SAMPLE_RATE, thresholdDbfs: -40, paddingMs: 20 };
@@ -35,6 +36,39 @@ describe("trimSilence", () => {
   it("handles input shorter than one window", () => {
     expect(trimSilence(tone(3, 0.3), OPTIONS).length).toBe(3);
     expect(trimSilence(new Float32Array(0), OPTIONS).length).toBe(0);
+  });
+});
+
+describe("analyzeTake", () => {
+  it("measures the noise floor of the leading silence against the speech", () => {
+    const noise = tone(300, 0.001);
+    const speech = tone(400, 0.5);
+    const analysis = analyzeTake(new Float32Array([...noise, ...speech]), OPTIONS);
+    expect(analysis.noiseRms).toBeCloseTo(0.001, 4);
+    expect(analysis.speechRms).toBeCloseTo(0.5, 2);
+    expect(analysis.snrDb).toBeCloseTo(54, 0);
+    expect(analysis.samples.length).toBe(400 + 20);
+  });
+
+  it("has no noise estimate when speech starts at once", () => {
+    const analysis = analyzeTake(tone(400, 0.5), OPTIONS);
+    expect(analysis.noiseRms).toBeNull();
+    expect(analysis.snrDb).toBeNull();
+  });
+});
+
+describe("normalize", () => {
+  it("removes a DC offset", () => {
+    const biased = new Float32Array([0.3, 0.1, 0.3, 0.1]);
+    const centred = removeDcOffset(biased);
+    const mean = centred.reduce((sum, sample) => sum + sample, 0) / centred.length;
+    expect(Math.abs(mean)).toBeLessThan(1e-6);
+  });
+
+  it("scales the peak to the target level and leaves silence alone", () => {
+    const loud = normalizePeak(tone(10, 0.25), -6);
+    expect(Math.max(...loud.map(Math.abs))).toBeCloseTo(0.501, 2);
+    expect(normalizePeak(new Float32Array(10), -6)).toEqual(new Float32Array(10));
   });
 });
 
