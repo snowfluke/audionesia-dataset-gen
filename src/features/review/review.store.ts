@@ -1,6 +1,7 @@
 import { createMemo, createSignal, onCleanup } from "solid-js";
 
 import { attempt, showToast } from "../../components/toast.tsx";
+import { checkClipWithAsr } from "../../lib/asr/check.ts";
 import type { Playback } from "../../lib/audio/playback.ts";
 import { playWav } from "../../lib/audio/playback.ts";
 import { decodeWav } from "../../lib/audio/wav-encode.ts";
@@ -23,6 +24,9 @@ export const REVIEW_FILTERS: readonly { id: ClipStatus; label: string }[] = [
 ];
 
 export type ReviewStore = {
+  /** Model download or transcription in flight; text describes the step. */
+  asrProgress: () => string | null;
+  checkAsr: () => Promise<void>;
   filter: () => ClipStatus;
   setFilter: (status: ClipStatus) => void;
   clips: () => Clip[];
@@ -43,6 +47,7 @@ export function createReviewStore(): ReviewStore {
   const [filter, setFilter] = createSignal<ClipStatus>("pending");
   const [batchDone, setBatchDone] = createSignal(0);
   const [playing, setPlaying] = createSignal(false);
+  const [asrProgress, setAsrProgress] = createSignal<string | null>(null);
   let playback: Playback | null = null;
 
   const clips = createMemo(async (): Promise<Clip[]> => {
@@ -116,6 +121,27 @@ export function createReviewStore(): ReviewStore {
     showToast("Klip dihapus");
   }
 
+  async function checkAsr(): Promise<void> {
+    const clip = current();
+    if (clip === undefined || asrProgress() !== null) return;
+    setAsrProgress("Menyiapkan model ASR...");
+    try {
+      const result = await checkClipWithAsr(clip, settings().asrModel, (file, percent) =>
+        setAsrProgress(`Mengunduh ${file} ${percent.toFixed(0)}%`)
+      );
+      bumpClips();
+      const percent = Math.round(result.cer * 100);
+      showToast(
+        result.cer > settings().asrCerWarn
+          ? `ASR berbeda ${percent}% dari naskah; dengarkan lagi`
+          : `ASR cocok dengan naskah (${percent}% beda)`,
+        result.cer > settings().asrCerWarn ? "info" : "success"
+      );
+    } finally {
+      setAsrProgress(null);
+    }
+  }
+
   // oxlint-disable solid/reactivity -- keydown handlers run outside Solid tracking on purpose
   const unregister = registerShortcuts(
     new Map([
@@ -131,6 +157,8 @@ export function createReviewStore(): ReviewStore {
   });
 
   return {
+    asrProgress,
+    checkAsr,
     filter,
     setFilter,
     clips,

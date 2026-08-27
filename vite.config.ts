@@ -9,4 +9,6 @@ export default defineConfig({
   plugins: [solidPlugin(), tailwindcss()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   worker: { format: "es" },
+  // transformers.js locates its ONNX runtime with import.meta.url; pre-bundling breaks that.
+  optimizeDeps: { exclude: ["@huggingface/transformers"] },
 });

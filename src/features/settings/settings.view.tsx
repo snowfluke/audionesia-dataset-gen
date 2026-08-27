@@ -11,6 +11,7 @@ import { listClipsBySpeakerStatus } from "../../lib/db/clip.repository.ts";
 import { getScript } from "../../lib/db/script.repository.ts";
 import type { DurationSample } from "../../lib/duration.ts";
 import { MIN_CALIBRATION_CLIPS, fitSyllablesPerSecond } from "../../lib/duration.ts";
+import { ASR_MODELS } from "../../lib/asr/messages.ts";
 import type { AppSettings, TrainerPreset } from "../../lib/settings.ts";
 import { EXPORT_SAMPLE_RATES, TRAINER_PRESETS, TRAINER_PRESET_IDS } from "../../lib/settings.ts";
 import { rebuildScripts } from "../library/library.store.ts";
@@ -48,7 +49,19 @@ const AUDIO_FIELDS: readonly NumberField[] = [
     min: 0.1,
   },
   { key: "minSnrDb", label: "Peringatan jika SNR di bawah (dB)", step: 1, min: 0 },
+  {
+    key: "asrCerWarn",
+    label: "Ambang perbedaan ASR yang ditandai (0 sampai 1)",
+    step: 0.05,
+    min: 0,
+    max: 1,
+  },
 ];
+
+const ASR_OPTIONS = ASR_MODELS.map((model) => ({
+  value: model,
+  label: model.replace("onnx-community/", ""),
+}));
 
 const RATE_OPTIONS = EXPORT_SAMPLE_RATES.map((rate) => ({
   value: String(rate),
@@ -195,6 +208,14 @@ export default function SettingsView(): JSX.Element {
               if (rate !== undefined)
                 void attempt(() => updateSettings({ exportSampleRate: rate }));
             }}
+          />
+        </label>
+        <label class="flex flex-col gap-1 text-base">
+          Model ASR (whisper-tiny cepat, whisper-small paling teliti; diunduh sekali)
+          <Select
+            options={ASR_OPTIONS}
+            value={settings().asrModel}
+            onChange={(model) => void attempt(() => updateSettings({ asrModel: model }))}
           />
         </label>
         <Switch

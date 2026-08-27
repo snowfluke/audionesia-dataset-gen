@@ -70,7 +70,7 @@ export default function ReviewView(): JSX.Element {
                   </Show>
                   <Show when={clip().asrCer}>
                     {(cer) => (
-                      <Badge variant={cer() > 0.2 ? "warning" : "secondary"}>
+                      <Badge variant={cer() > settings().asrCerWarn ? "warning" : "secondary"}>
                         ASR {Math.round(cer() * 100)}% beda
                       </Badge>
                     )}
@@ -121,6 +121,13 @@ export default function ReviewView(): JSX.Element {
                 </Show>
                 <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
                   Hapus
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={store.asrProgress() !== null}
+                  onClick={() => void attempt(store.checkAsr)}
+                >
+                  {store.asrProgress() ?? "Periksa dengan ASR"}
                 </Button>
                 <BatchDots done={store.batchDone()} size={settings().batchSize} />
               </div>

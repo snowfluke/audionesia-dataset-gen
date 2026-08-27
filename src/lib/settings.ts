@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { ASR_MODELS } from "./asr/messages.ts";
 import { DEFAULT_SYLLABLES_PER_SECOND } from "./duration.ts";
 
 export const EXPORT_SAMPLE_RATES = [16000, 22050, 24000, 44100, 48000] as const;
@@ -45,6 +46,10 @@ export const appSettingsSchema = z
     normalizePeakDbfs: z.number().max(0).nullable().default(-3),
     /** `cc0` exports only clips whose text is public domain. */
     licenseMode: z.enum(LICENSE_MODES).default("all"),
+    /** Whisper model used by the ASR check; larger is slower and more accurate. */
+    asrModel: z.enum(ASR_MODELS).default("onnx-community/whisper-base"),
+    /** Clips whose ASR transcript differs from the script by more than this share get flagged. */
+    asrCerWarn: z.number().min(0).max(1).default(0.2),
   })
   .refine((settings) => settings.targetMinSec < settings.targetMaxSec, {
     message: "Durasi minimum harus lebih kecil dari durasi maksimum",

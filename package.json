@@ -33,6 +33,7 @@
     "prepare": "lefthook install"
   },
   "dependencies": {
+    "@huggingface/transformers": "4.2.0",
     "@solidjs/web": "2.0.0-rc.3",
     "fflate": "0.8.3",
     "idb": "8.0.3",

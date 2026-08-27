@@ -100,6 +100,25 @@ export default function ExportPanel(props: ExportPanelProps): JSX.Element {
       </LayerCard>
 
       <LayerCard class="flex flex-col gap-3">
+        <h2 class="text-lg font-semibold text-kumo-strong">Pemeriksaan ASR</h2>
+        <p class="text-base text-kumo-subtle">
+          Whisper ({settings().asrModel.replace("onnx-community/", "")}) berjalan di peramban dan
+          menulis ulang setiap klip yang menunggu; klip yang berbeda lebih dari{" "}
+          {Math.round(settings().asrCerWarn * 100)}% dari naskahnya diberi tanda di tab Dengarkan.
+          Model diunduh sekali dan disimpan peramban.
+        </p>
+        <Button
+          disabled={busy()}
+          onClick={() => {
+            const store = props.store;
+            void attempt(() => store.checkPendingWithAsr());
+          }}
+        >
+          Periksa semua klip menunggu
+        </Button>
+      </LayerCard>
+
+      <LayerCard class="flex flex-col gap-3">
         <h2 class="text-lg font-semibold text-kumo-strong">Cadangan</h2>
         <p class="text-base text-kumo-subtle">
           Peramban bisa menghapus penyimpanan lokal kapan saja. Cadangan menyimpan pembicara, semua

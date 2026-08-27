@@ -1,6 +1,7 @@
 import { createMemo, createSignal } from "solid-js";
 
 import { showToast } from "../../components/toast.tsx";
+import { checkClipWithAsr } from "../../lib/asr/check.ts";
 import { exportBackup } from "../../lib/backup/backup.ts";
 import { folderSource, restoreBackup, zipSource } from "../../lib/backup/restore.ts";
 import { deleteRejectedAudio, listClipsByStatus } from "../../lib/db/clip.repository.ts";
@@ -68,6 +69,8 @@ export type DatasetStore = {
   restoreFromFolder: () => Promise<void>;
   restoreFromZip: (file: File) => Promise<void>;
   freeRejectedAudio: () => Promise<void>;
+  /** Transcribes every pending clip and flags the ones that differ from their script. */
+  checkPendingWithAsr: () => Promise<void>;
   canPickDirectory: () => boolean;
 };
 
@@ -234,6 +237,34 @@ export function createDatasetStore(): DatasetStore {
     showToast(`${formatBytes(bytes)} dibebaskan`, "success");
   }
 
+  async function checkPendingWithAsr(): Promise<void> {
+    const current = settings();
+    const pending = await listClipsByStatus("pending");
+    if (pending.length === 0) {
+      showToast("Tidak ada klip yang menunggu tinjauan");
+      return;
+    }
+    await run("Memeriksa dengan ASR", async (report) => {
+      let flagged = 0;
+      for (const [done, clip] of pending.entries()) {
+        const result = await checkClipWithAsr(clip, current.asrModel, (file, percent) =>
+          setProgress({
+            label: `Mengunduh ${file} ${percent.toFixed(0)}%`,
+            done: 0,
+            total: pending.length,
+          })
+        );
+        if (result.cer > current.asrCerWarn) flagged += 1;
+        report(done + 1, pending.length);
+      }
+      bumpClips();
+      showToast(
+        `${formatCount(flagged)} dari ${formatCount(pending.length)} klip berbeda dari naskah`,
+        flagged > 0 ? "info" : "success"
+      );
+    });
+  }
+
   return {
     stats,
     formats,
@@ -245,6 +276,7 @@ export function createDatasetStore(): DatasetStore {
     restoreFromFolder,
     restoreFromZip,
     freeRejectedAudio,
+    checkPendingWithAsr,
     canPickDirectory,
   };
 }
