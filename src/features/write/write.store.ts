@@ -1,6 +1,8 @@
 import { createSignal } from "solid-js";
 
 import { showToast } from "../../components/toast.tsx";
+import { FOREIGN_SHARE } from "../../lib/corpus/coverage.ts";
+import type { RejectReason } from "../../lib/corpus/filter.ts";
 import { dedupKey, normalizeSentence, rejectReason } from "../../lib/corpus/filter.ts";
 import { textsFromFile } from "../../lib/corpus/import.ts";
 import { phonemize } from "../../lib/g2p/client.ts";
@@ -11,12 +13,28 @@ const PHONEMIZE_BATCH = 500;
 
 export type WritePhase = "editing" | "analyzing" | "previewing" | "saving";
 
+export type RejectedLine = { line: string; reason: RejectReason | "duplicate" | "foreign" };
+
+export const REJECT_LABELS = {
+  "too-short": "terlalu pendek",
+  "too-few-words": "kurang dari 4 kata",
+  "too-long": "terlalu panjang",
+  "non-ascii": "memuat huruf non-Latin",
+  markup: "memuat tanda markup",
+  url: "memuat alamat web",
+  "no-letters": "hampir tanpa huruf",
+  "too-many-digits": "terlalu banyak angka",
+  "too-many-capitals": "terlalu banyak huruf kapital",
+  duplicate: "duplikat di dalam teks ini",
+  foreign: "sebagian besar kata dibaca sebagai bahasa Inggris",
+} as const satisfies Record<RejectedLine["reason"], string>;
+
 export type WriteStore = {
   text: () => string;
   setText: (value: string) => void;
   phase: () => WritePhase;
   preview: () => Phonemized[];
-  rejected: () => number;
+  rejected: () => RejectedLine[];
   analyze: () => Promise<void>;
   commit: (rebuild: boolean) => Promise<void>;
   addFiles: (files: FileList | File[]) => Promise<void>;
@@ -28,23 +46,24 @@ export function createWriteStore(): WriteStore {
   const [text, setText] = createSignal("");
   const [phase, setPhase] = createSignal<WritePhase>("editing");
   const [preview, setPreview] = createSignal<Phonemized[]>([]);
-  const [rejected, setRejected] = createSignal(0);
+  const [rejected, setRejected] = createSignal<RejectedLine[]>([]);
   const [g2pVersion, setG2pVersion] = createSignal("");
 
   function candidates(): string[] {
     const seen = new Set<string>();
     const accepted: string[] = [];
-    let dropped = 0;
+    const dropped: RejectedLine[] = [];
     for (const line of text().split("\n")) {
       const sentence = normalizeSentence(line);
       if (sentence === "") continue;
+      const reason = rejectReason(sentence);
       const key = dedupKey(sentence);
-      if (rejectReason(sentence) !== null || seen.has(key)) {
-        dropped += 1;
-        continue;
+      if (reason !== null) dropped.push({ line: sentence, reason });
+      else if (seen.has(key)) dropped.push({ line: sentence, reason: "duplicate" });
+      else {
+        seen.add(key);
+        accepted.push(sentence);
       }
-      seen.add(key);
-      accepted.push(sentence);
     }
     setRejected(dropped);
     return accepted;
@@ -59,16 +78,22 @@ export function createWriteStore(): WriteStore {
     setPhase("analyzing");
     try {
       const results: Phonemized[] = [];
+      const foreign: RejectedLine[] = [];
       for (let start = 0; start < sentences.length; start += PHONEMIZE_BATCH) {
         const response = await phonemize(sentences.slice(start, start + PHONEMIZE_BATCH));
-        results.push(...response.results);
+        for (const result of response.results) {
+          if (result.englishShare >= FOREIGN_SHARE)
+            foreign.push({ line: result.text, reason: "foreign" });
+          else results.push(result);
+        }
         setG2pVersion(response.g2pVersion);
       }
+      setRejected((current) => [...current, ...foreign]);
       setPreview(results);
       setPhase("previewing");
-    } catch (error: unknown) {
+    } catch (cause: unknown) {
       setPhase("editing");
-      throw error;
+      throw cause;
     }
   }
 
@@ -76,14 +101,19 @@ export function createWriteStore(): WriteStore {
     if (phase() !== "previewing") return;
     setPhase("saving");
     try {
-      const added = await addUserSentences(preview(), g2pVersion());
-      showToast(`${added.toLocaleString("id-ID")} kalimat ditambahkan ke kumpulan`, "success");
+      const result = await addUserSentences(preview(), g2pVersion());
+      const note =
+        result.duplicates > 0
+          ? `, ${result.duplicates.toLocaleString("id-ID")} sudah ada di kumpulan`
+          : "";
+      showToast(`${result.added.toLocaleString("id-ID")} kalimat ditambahkan${note}`, "success");
       if (rebuild) {
         const count = await rebuildScripts();
         showToast(`${count.toLocaleString("id-ID")} naskah disusun ulang`, "success");
       }
       setText("");
       setPreview([]);
+      setRejected([]);
     } finally {
       setPhase("editing");
     }

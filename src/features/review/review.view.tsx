@@ -1,94 +1,156 @@
 import type { JSX } from "@solidjs/web";
-import { For, Loading, Show } from "solid-js";
+import { Loading, Show, createSignal } from "solid-js";
 
 import Badge from "../../components/badge.tsx";
 import Banner from "../../components/banner.tsx";
 import Button from "../../components/button.tsx";
+import Dialog from "../../components/dialog.tsx";
 import Kbd from "../../components/kbd.tsx";
 import LayerCard from "../../components/layer-card.tsx";
+import Tabs from "../../components/tabs.tsx";
 import { attempt } from "../../components/toast.tsx";
+import Waveform from "../../components/waveform.tsx";
 import { formatCount, formatSeconds } from "../../lib/format.ts";
+import BatchDots from "../record/batch-dots.tsx";
 import { settings } from "../settings/settings.store.ts";
 import { currentSpeakerId } from "../speakers/speakers.store.ts";
-import { createReviewStore } from "./review.store.ts";
+import { REVIEW_FILTERS, createReviewStore } from "./review.store.ts";
 
 export default function ReviewView(): JSX.Element {
   const store = createReviewStore();
+  const [confirmDelete, setConfirmDelete] = createSignal(false);
+  const emptyCopy = (): string => {
+    if (store.filter() === "approved") return "Belum ada klip yang disetujui untuk pembicara ini.";
+    if (store.filter() === "rejected") return "Belum ada klip yang ditolak untuk pembicara ini.";
+    return "Tidak ada klip yang menunggu tinjauan untuk pembicara ini.";
+  };
+
   return (
     <div class="flex flex-col gap-4">
       <Show when={currentSpeakerId() === null}>
         <Banner variant="alert">Pilih pembicara dulu untuk meninjau klipnya.</Banner>
       </Show>
-      <p class="text-base text-kumo-subtle">
-        Klik <Kbd>Spasi</Kbd> untuk memutar. Apakah naskahnya diucapkan dengan akurat dan bersih?
-      </p>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          items={REVIEW_FILTERS}
+          value={store.filter()}
+          onChange={store.setFilter}
+          label="Status klip"
+        />
+        <p class="text-base text-kumo-subtle">
+          <Kbd>Spasi</Kbd> putar · <Kbd>Y</Kbd> setujui · <Kbd>N</Kbd> tolak
+        </p>
+      </div>
       <Loading fallback={<p class="text-kumo-subtle">Memuat klip...</p>}>
         <Show
           when={store.current()}
-          fallback={<Banner>Tidak ada klip yang menunggu tinjauan untuk pembicara ini.</Banner>}
+          fallback={
+            <Show when={currentSpeakerId() !== null}>
+              <Banner>{emptyCopy()}</Banner>
+            </Show>
+          }
         >
           {(clip) => (
             <LayerCard class="flex flex-col gap-4">
-              <div class="flex items-center justify-between text-xs text-kumo-subtle">
+              <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-kumo-subtle">
                 <span>
                   clip_{String(clip().seq).padStart(4, "0")} · {formatSeconds(clip().durationSec)} ·{" "}
-                  {formatCount(store.pending().length)} menunggu
+                  {formatCount(store.clips().length)} klip di daftar ini
                 </span>
-                <Badge variant={clip().clipped ? "error" : "secondary"}>
-                  Puncak {clip().peakDbfs.toFixed(1)} dBFS
-                </Badge>
+                <div class="flex gap-2">
+                  <Badge variant={clip().clipped ? "error" : "secondary"}>
+                    Puncak {clip().peakDbfs.toFixed(1)} dBFS{clip().clipped ? " (terpotong)" : ""}
+                  </Badge>
+                  <Show when={clip().snrDb}>
+                    {(snr) => (
+                      <Badge variant={snr() < settings().minSnrDb ? "warning" : "secondary"}>
+                        SNR {snr().toFixed(0)} dB
+                      </Badge>
+                    )}
+                  </Show>
+                  <Show when={clip().asrCer}>
+                    {(cer) => (
+                      <Badge variant={cer() > 0.2 ? "warning" : "secondary"}>
+                        ASR {Math.round(cer() * 100)}% beda
+                      </Badge>
+                    )}
+                  </Show>
+                </div>
               </div>
               <p class="text-2xl leading-relaxed text-kumo-strong">{clip().text}</p>
               <Show when={settings().showPhonemes}>
                 <p class="font-mono text-base text-kumo-subtle">{clip().phonemes}</p>
               </Show>
+              <Show when={clip().asrText}>
+                {(text) => <p class="text-base text-kumo-subtle">Didengar ASR: {text()}</p>}
+              </Show>
+              <Loading fallback={<div class="h-[72px] rounded-md bg-kumo-tint" />}>
+                <Waveform samples={store.waveform()} label="Bentuk gelombang klip" />
+              </Loading>
               <div class="flex flex-wrap items-center gap-2">
                 <Button
                   variant="primary"
                   size="lg"
-                  onClick={() => attempt(store.play)}
+                  onClick={() => void attempt(store.play)}
                   disabled={store.playing()}
                 >
                   {store.playing() ? "Memutar..." : "Putar"}
                 </Button>
-                <Button size="lg" onClick={() => attempt(() => store.decide("approved"))}>
-                  Ya
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={() => attempt(() => store.decide("rejected"))}
-                >
-                  Tidak
-                </Button>
-                <Button variant="ghost" onClick={() => attempt(store.remove)}>
+                <Show when={clip().status !== "approved"}>
+                  <Button
+                    variant="success"
+                    size="lg"
+                    onClick={() => void attempt(() => store.decide("approved"))}
+                  >
+                    Ya
+                  </Button>
+                </Show>
+                <Show when={clip().status !== "rejected"}>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={() => void attempt(() => store.decide("rejected"))}
+                  >
+                    Tidak
+                  </Button>
+                </Show>
+                <Show when={clip().status === "approved"}>
+                  <Button variant="outline" onClick={() => void attempt(store.requeue)}>
+                    Rekam ulang naskah
+                  </Button>
+                </Show>
+                <Button variant="ghost" onClick={() => setConfirmDelete(true)}>
                   Hapus
                 </Button>
-                <div class="ml-auto flex items-center gap-1" aria-label="Kemajuan batch">
-                  <For each={Array.from({ length: settings().batchSize }, (_, i) => i)}>
-                    {(index) => (
-                      <span
-                        class={[
-                          "h-6 w-6 rounded-full text-center text-xs leading-6 ring ring-kumo-line",
-                          {
-                            "bg-kumo-contrast text-kumo-base": index < store.batchDone(),
-                            "text-kumo-subtle": index >= store.batchDone(),
-                          },
-                        ]}
-                      >
-                        {index + 1}
-                      </span>
-                    )}
-                  </For>
-                </div>
+                <BatchDots done={store.batchDone()} size={settings().batchSize} />
               </div>
-              <p class="text-xs text-kumo-subtle">
-                <Kbd>Y</Kbd> setujui · <Kbd>N</Kbd> tolak
-              </p>
             </LayerCard>
           )}
         </Show>
       </Loading>
+      <Dialog
+        open={confirmDelete()}
+        onClose={() => setConfirmDelete(false)}
+        title="Hapus klip?"
+        description="Rekaman ini dihapus dari penyimpanan dan tidak bisa dikembalikan. Naskahnya kembali ke antrean Rekam."
+      >
+        <div class="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+            Batal
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() =>
+              void attempt(async () => {
+                await store.remove();
+                setConfirmDelete(false);
+              })
+            }
+          >
+            Hapus
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

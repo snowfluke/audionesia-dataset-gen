@@ -25,7 +25,7 @@ async function coverageCurve(): Promise<{ points: Point[]; diphones: number; hou
   for (const line of (await Bun.file("public/corpus/pool.jsonl").text()).split("\n")) {
     if (line.trim() === "") continue;
     const row = poolSentenceSchema.parse(JSON.parse(line));
-    entries.push({ id: row.id, syllables: row.syllables, units: row.units });
+    entries.push({ id: row.id, syllables: row.syllables, units: row.units, source: row.source });
     unitsById.set(row.id, row.units);
   }
   const isDiphone = index.units.map((label) => label.startsWith("d:"));

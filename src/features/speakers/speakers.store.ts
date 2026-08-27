@@ -1,11 +1,10 @@
 import { createSignal } from "solid-js";
 
-import type { Speaker, SpeakerGender } from "../../lib/db/schema.ts";
+import type { AgeRange, Speaker, SpeakerGender } from "../../lib/db/schema.ts";
 import {
+  createSpeakerIfAbsent,
   deleteSpeaker,
-  getSpeaker,
   listSpeakers,
-  putSpeaker,
 } from "../../lib/db/speaker.repository.ts";
 import { slugify } from "../../lib/slug.ts";
 
@@ -34,7 +33,7 @@ export function selectSpeaker(id: string | null): void {
   }
 }
 
-/** Reads every speaker; re-runs when `speakersVersion` changes. */
+/** Reads every speaker in creation order; re-runs when `speakersVersion` changes. */
 export async function loadSpeakers(): Promise<Speaker[]> {
   const speakers = await listSpeakers();
   const selected = currentSpeakerId();
@@ -46,21 +45,32 @@ export async function loadSpeakers(): Promise<Speaker[]> {
   return speakers;
 }
 
-export async function createSpeaker(
-  name: string,
-  gender: SpeakerGender | undefined
-): Promise<Speaker> {
-  const id = slugify(name);
+export type NewSpeaker = {
+  name: string;
+  gender: SpeakerGender | null;
+  ageRange: AgeRange | null;
+  dialect: string;
+  microphone: string;
+  consent: boolean;
+};
+
+export async function createSpeaker(input: NewSpeaker): Promise<Speaker> {
+  const id = slugify(input.name);
   if (id === "") throw new Error("Nama pembicara harus memuat huruf atau angka");
-  if ((await getSpeaker(id)) !== undefined) throw new Error(`Pembicara "${id}" sudah ada`);
+  if (!input.consent) throw new Error("Persetujuan pembicara diperlukan sebelum merekam");
+  const now = new Date().toISOString();
   const speaker: Speaker = {
     id,
-    name: name.trim(),
+    name: input.name.trim(),
     nextSeq: 1,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    consentAt: now,
   };
-  if (gender !== undefined) speaker.gender = gender;
-  await putSpeaker(speaker);
+  if (input.gender !== null) speaker.gender = input.gender;
+  if (input.ageRange !== null) speaker.ageRange = input.ageRange;
+  if (input.dialect.trim() !== "") speaker.dialect = input.dialect.trim();
+  if (input.microphone.trim() !== "") speaker.microphone = input.microphone.trim();
+  if (!(await createSpeakerIfAbsent(speaker))) throw new Error(`Pembicara "${id}" sudah ada`);
   setSpeakersVersion((version) => version + 1);
   selectSpeaker(id);
   return speaker;

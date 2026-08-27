@@ -2,6 +2,8 @@ import type { JSX } from "@solidjs/web";
 import { For, createSignal } from "solid-js";
 
 const TOAST_MS = 4000;
+/** Older toasts drop off so the stack never grows past this. */
+const MAX_TOASTS = 3;
 
 export type ToastTone = "info" | "success" | "error";
 type Toast = { id: number; message: string; tone: ToastTone };
@@ -19,7 +21,7 @@ let nextId = 1;
 export function showToast(message: string, tone: ToastTone = "info"): void {
   const id = nextId;
   nextId += 1;
-  setToasts((current) => [...current, { id, message, tone }]);
+  setToasts((current) => [...current, { id, message, tone }].slice(-MAX_TOASTS));
   setTimeout(() => setToasts((current) => current.filter((toast) => toast.id !== id)), TOAST_MS);
 }
 
@@ -43,7 +45,7 @@ export async function attempt(task: () => Promise<void>): Promise<void> {
 export default function Toaster(): JSX.Element {
   return (
     <div
-      class="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2"
+      class="pointer-events-none fixed right-4 bottom-16 z-50 flex max-w-[320px] flex-col items-end gap-2"
       aria-live="polite"
     >
       <For each={toasts()}>

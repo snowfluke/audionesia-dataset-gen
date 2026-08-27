@@ -8,9 +8,10 @@ import LayerCard from "../../components/layer-card.tsx";
 import { Cell, Head, Row, Table } from "../../components/table.tsx";
 import { attempt } from "../../components/toast.tsx";
 import { formatCount } from "../../lib/format.ts";
-import { createWriteStore } from "./write.store.ts";
+import { REJECT_LABELS, createWriteStore } from "./write.store.ts";
 
 const PREVIEW_ROWS = 20;
+const REJECTED_ROWS = 20;
 
 export default function WriteView(): JSX.Element {
   const store = createWriteStore();
@@ -20,7 +21,7 @@ export default function WriteView(): JSX.Element {
     event.preventDefault();
     setDragging(false);
     const files = event.dataTransfer?.files;
-    if (files !== undefined && files.length > 0) attempt(() => store.addFiles(files));
+    if (files !== undefined && files.length > 0) void attempt(() => store.addFiles(files));
   };
 
   return (
@@ -48,7 +49,7 @@ export default function WriteView(): JSX.Element {
         <div class="flex flex-wrap items-center gap-2">
           <Button
             variant="primary"
-            onClick={() => attempt(store.analyze)}
+            onClick={() => void attempt(store.analyze)}
             disabled={store.phase() !== "editing"}
           >
             {store.phase() === "analyzing" ? "Mengubah ke fonem..." : "Pratinjau fonem"}
@@ -62,27 +63,37 @@ export default function WriteView(): JSX.Element {
               class="hidden"
               onChange={(event) => {
                 const files = event.currentTarget.files;
-                if (files !== null && files.length > 0) attempt(() => store.addFiles(files));
+                if (files !== null && files.length > 0) void attempt(() => store.addFiles(files));
                 event.currentTarget.value = "";
               }}
             />
           </label>
-          <Show when={store.rejected() > 0}>
-            <span class="text-xs text-kumo-subtle">
-              {formatCount(store.rejected())} baris dilewati (terlalu pendek, duplikat, atau bukan
-              teks Latin)
-            </span>
-          </Show>
         </div>
+        <Show when={store.rejected().length > 0}>
+          <details class="text-xs text-kumo-subtle">
+            <summary class="cursor-pointer">
+              {formatCount(store.rejected().length)} baris dilewati
+            </summary>
+            <ul class="mt-2 flex flex-col gap-1">
+              <For each={store.rejected().slice(0, REJECTED_ROWS)}>
+                {(item) => (
+                  <li>
+                    <span class="text-kumo-warning">{REJECT_LABELS[item.reason]}</span>: {item.line}
+                  </li>
+                )}
+              </For>
+            </ul>
+          </details>
+        </Show>
       </LayerCard>
 
       <Show when={store.phase() === "previewing" || store.phase() === "saving"}>
         <LayerCard class="flex flex-col gap-3">
-          <div class="flex items-center justify-between">
+          <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="text-base font-medium text-kumo-strong">
               {formatCount(store.preview().length)} kalimat siap ditambahkan
             </span>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
               <Button
                 variant="ghost"
                 onClick={() => store.discard()}
@@ -91,17 +102,18 @@ export default function WriteView(): JSX.Element {
                 Batal
               </Button>
               <Button
-                onClick={() => attempt(() => store.commit(false))}
-                disabled={store.phase() === "saving"}
-              >
-                Tambahkan
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => attempt(() => store.commit(true))}
+                variant="outline"
+                onClick={() => void attempt(() => store.commit(true))}
                 disabled={store.phase() === "saving"}
               >
                 Tambahkan dan susun ulang naskah
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => void attempt(() => store.commit(false))}
+                disabled={store.phase() === "saving"}
+              >
+                Tambahkan
               </Button>
             </div>
           </div>

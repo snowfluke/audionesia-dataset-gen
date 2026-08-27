@@ -2,12 +2,21 @@ import { createSignal } from "solid-js";
 
 import { buildScriptsInWorker } from "../../lib/corpus/builder-client.ts";
 import { createUnitTable, internUnit } from "../../lib/corpus/coverage.ts";
+import { dedupKey } from "../../lib/corpus/filter.ts";
 import { fetchPoolIndex, fetchPoolRows } from "../../lib/corpus/pool-loader.ts";
-import type { PoolSentence } from "../../lib/corpus/schema.ts";
+import type { PoolIndex, PoolSentence } from "../../lib/corpus/schema.ts";
+import { listClips } from "../../lib/db/clip.repository.ts";
 import type { ScriptRow } from "../../lib/db/schema.ts";
-import { clearScripts, countScripts, putScripts } from "../../lib/db/script.repository.ts";
-import { countSentences, listSentences, putSentences } from "../../lib/db/sentence.repository.ts";
-import { listUnitLabels, putUnitLabels } from "../../lib/db/unit.repository.ts";
+import { countScripts, listScripts, replaceScripts } from "../../lib/db/script.repository.ts";
+import {
+  clearSentences,
+  existingSentenceIds,
+  listSentences,
+  listSentencesBySource,
+  putSentences,
+} from "../../lib/db/sentence.repository.ts";
+import { loadLibraryMeta, saveLibraryMeta } from "../../lib/db/settings.repository.ts";
+import { clearUnitLabels, listUnitLabels, putUnitLabels } from "../../lib/db/unit.repository.ts";
 import { estimateSeconds } from "../../lib/duration.ts";
 import type { Phonemized } from "../../lib/g2p/messages.ts";
 import { textId } from "../../lib/hash.ts";
@@ -26,10 +35,33 @@ export function bumpClips(): void {
   setClipsVersion((version) => version + 1);
 }
 
-async function seedPool(): Promise<void> {
+/** Maps a sentence's unit ids from an old label table onto the current one. */
+function remapUnits(
+  units: readonly number[],
+  oldLabels: readonly string[],
+  table: ReturnType<typeof createUnitTable>
+): number[] {
+  const mapped: number[] = [];
+  for (const id of units) {
+    const label = oldLabels[id];
+    if (label !== undefined) mapped.push(internUnit(table, label));
+  }
+  return mapped;
+}
+
+/**
+ * Replaces the bundled pool with the one the site currently serves. Sentences
+ * added in Tulis survive with their units remapped onto the new label table.
+ */
+async function reseed(index: PoolIndex): Promise<void> {
   setPhase("seeding");
   setProgress("Memuat indeks korpus...");
-  const index = await fetchPoolIndex();
+  const [oldLabels, userRows] = await Promise.all([
+    listUnitLabels(),
+    listSentencesBySource("user"),
+  ]);
+  await clearSentences();
+  await clearUnitLabels();
   await putUnitLabels(index.units);
   let loaded = 0;
   await fetchPoolRows(async (rows) => {
@@ -39,20 +71,44 @@ async function seedPool(): Promise<void> {
       `Memuat kalimat ${loaded.toLocaleString("id-ID")} / ${index.count.toLocaleString("id-ID")}`
     );
   });
+  const table = createUnitTable(index.units);
+  const remapped = userRows.map((row) => ({
+    ...row,
+    units: remapUnits(row.units, oldLabels, table),
+  }));
+  if (table.labels.length > index.units.length) {
+    await putUnitLabels(table.labels.slice(index.units.length), index.units.length);
+  }
+  await putSentences(remapped);
+  await saveLibraryMeta({
+    poolCount: index.count,
+    g2pVersion: index.g2pVersion,
+    seededAt: new Date().toISOString(),
+  });
 }
 
-/** Rebuilds every script from the current pool and window settings. Script ids are stable per sentence set. */
+/**
+ * Rebuilds every script from the current pool and window settings. Script ids
+ * hash their sentence ids, so unchanged groupings keep their id; old scripts
+ * that recorded clips still reference are kept so nothing dangles.
+ */
 export async function rebuildScripts(): Promise<number> {
   setPhase("building");
   setProgress("Menyusun naskah...");
   const current = settings();
-  const [sentences, labels] = await Promise.all([listSentences(), listUnitLabels()]);
+  const [sentences, labels, oldScripts, clips] = await Promise.all([
+    listSentences(),
+    listUnitLabels(),
+    listScripts(),
+    listClips(),
+  ]);
   const bySentenceId = new Map(sentences.map((sentence) => [sentence.id, sentence]));
   const result = await buildScriptsInWorker({
     entries: sentences.map((sentence) => ({
       id: sentence.id,
       syllables: sentence.syllables,
       units: sentence.units,
+      source: sentence.source,
     })),
     options: {
       unitCount: labels.length,
@@ -80,38 +136,58 @@ export async function rebuildScripts(): Promise<number> {
       createdAt,
     });
   }
-  await clearScripts();
-  await putScripts(rows);
+  const newIds = new Set(rows.map((row) => row.id));
+  const referenced = new Set(clips.map((clip) => clip.scriptId));
+  const kept = oldScripts
+    .filter((script) => referenced.has(script.id) && !newIds.has(script.id))
+    .map((script, offset) => ({ ...script, order: rows.length + offset }));
+  await replaceScripts([...rows, ...kept]);
   setScriptsVersion((version) => version + 1);
   setPhase("ready");
   setProgress("");
   return rows.length;
 }
 
-/** Seeds the pool on first run and builds scripts when there are none. */
+/** Seeds or refreshes the pool when the served pool differs from the seeded one, then builds scripts. */
 export async function initLibrary(): Promise<void> {
   try {
-    if ((await countSentences()) === 0) await seedPool();
-    if ((await countScripts()) === 0) await rebuildScripts();
+    const meta = await loadLibraryMeta();
+    let index: PoolIndex | null = null;
+    try {
+      index = await fetchPoolIndex();
+    } catch (cause: unknown) {
+      if (meta === null) throw cause;
+    }
+    if (
+      index !== null &&
+      (meta === null || meta.poolCount !== index.count || meta.g2pVersion !== index.g2pVersion)
+    ) {
+      await reseed(index);
+      await rebuildScripts();
+    } else if ((await countScripts()) === 0) {
+      await rebuildScripts();
+    }
     setPhase("ready");
     setProgress("");
-  } catch (error: unknown) {
+  } catch (cause: unknown) {
     setPhase("error");
-    setProgress(error instanceof Error ? error.message : "Korpus gagal dimuat");
+    setProgress(cause instanceof Error ? cause.message : "Korpus gagal dimuat");
   }
 }
 
-/** Adds phonemized user text to the pool, extending the unit table with any new labels. */
+export type AddResult = { added: number; duplicates: number };
+
+/** Adds phonemized user text to the pool; sentences already in the pool are skipped. */
 export async function addUserSentences(
   results: readonly Phonemized[],
   g2pVersion: string
-): Promise<number> {
+): Promise<AddResult> {
   const labels = await listUnitLabels();
   const table = createUnitTable(labels);
-  const rows: PoolSentence[] = [];
+  const candidates: PoolSentence[] = [];
   for (const result of results) {
-    rows.push({
-      id: await textId(result.text.toLowerCase()),
+    candidates.push({
+      id: await textId(dedupKey(result.text)),
       text: result.text,
       phonemes: result.phonemes,
       syllables: result.syllables,
@@ -121,9 +197,11 @@ export async function addUserSentences(
       g2pVersion,
     });
   }
+  const existing = await existingSentenceIds(candidates.map((row) => row.id));
+  const fresh = candidates.filter((row) => !existing.has(row.id));
   if (table.labels.length > labels.length) {
     await putUnitLabels(table.labels.slice(labels.length), labels.length);
   }
-  await putSentences(rows);
-  return rows.length;
+  await putSentences(fresh);
+  return { added: fresh.length, duplicates: candidates.length - fresh.length };
 }

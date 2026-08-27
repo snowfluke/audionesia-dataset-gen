@@ -48,12 +48,19 @@ await shot("02-ready");
 console.log("create speaker");
 await page.getByRole("button", { name: "+ Pembicara baru" }).click();
 await page.getByPlaceholder("Budi Santoso").fill("Budi");
+await page.locator("dialog[open] input[type=checkbox]").check();
 await page.locator("dialog[open] button[type=submit]").click();
 await page.locator("select[aria-label=Pembicara]").waitFor({ timeout: 10_000 });
 await page.locator("p.text-2xl").first().waitFor({ timeout: 60_000 });
 const scriptText = await page.locator("p.text-2xl").first().innerText();
 console.log("script:", scriptText.slice(0, 120));
 await shot("03-script");
+
+console.log("allow clipped takes (the fake microphone is full scale)");
+await page.getByRole("tab", { name: "Pengaturan" }).click();
+await page.getByRole("switch", { name: /terpotong/ }).click();
+await page.getByRole("tab", { name: "Rekam" }).click();
+await page.locator("p.text-2xl").first().waitFor({ timeout: 60_000 });
 
 console.log("record");
 await page.getByRole("button", { name: "Nyalakan mikrofon" }).click();
@@ -74,6 +81,9 @@ await page.getByRole("button", { name: "Putar" }).click();
 await page.waitForTimeout(500);
 await page.getByRole("button", { name: "Ya", exact: true }).click();
 await page.getByText("Klip disetujui").waitFor({ timeout: 10_000 });
+await page.getByRole("tab", { name: "Disetujui" }).click();
+await page.getByRole("button", { name: "Rekam ulang naskah" }).waitFor({ timeout: 15_000 });
+await page.getByRole("tab", { name: "Menunggu" }).click();
 await shot("06-reviewed");
 
 console.log("dataset + export zip");
@@ -90,6 +100,14 @@ await download.saveAs(zipPath);
 console.log("zip saved:", zipPath);
 await page.getByText("klip diekspor").waitFor({ timeout: 15_000 });
 await shot("08-exported");
+
+console.log("backup zip");
+const [backup] = await Promise.all([
+  page.waitForEvent("download", { timeout: 60_000 }),
+  page.getByRole("button", { name: "Cadangkan sebagai ZIP" }).click(),
+]);
+await backup.saveAs(`${OUT}backup.zip`);
+await page.getByText("klip dicadangkan").waitFor({ timeout: 15_000 });
 
 console.log("settings tab");
 await page.getByRole("tab", { name: "Pengaturan" }).click();

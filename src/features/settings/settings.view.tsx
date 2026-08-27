@@ -21,13 +21,9 @@ type NumberKey = {
   [K in keyof AppSettings]: AppSettings[K] extends number ? K : never;
 }[keyof AppSettings];
 
-const NUMBER_FIELDS: readonly {
-  key: NumberKey;
-  label: string;
-  step: number;
-  min?: number;
-  max?: number;
-}[] = [
+type NumberField = { key: NumberKey; label: string; step: number; min?: number; max?: number };
+
+const WINDOW_FIELDS: readonly NumberField[] = [
   {
     key: "syllablesPerSecond",
     label: "Suku kata per detik (perkiraan durasi)",
@@ -37,9 +33,21 @@ const NUMBER_FIELDS: readonly {
   },
   { key: "targetMinSec", label: "Durasi target minimum (detik)", step: 1, min: 1 },
   { key: "targetMaxSec", label: "Durasi target maksimum (detik)", step: 1, min: 2 },
+  { key: "targetHours", label: "Target total rekaman (jam)", step: 1, min: 1 },
+  { key: "batchSize", label: "Klip per batch", step: 1, min: 1, max: 20 },
+];
+
+const AUDIO_FIELDS: readonly NumberField[] = [
   { key: "silenceThresholdDbfs", label: "Ambang senyap (dBFS)", step: 1, min: -90, max: 0 },
   { key: "silencePaddingMs", label: "Jeda senyap yang disimpan (ms)", step: 10, min: 0, max: 1000 },
-  { key: "batchSize", label: "Klip per batch", step: 1, min: 1, max: 20 },
+  { key: "maxTakeSec", label: "Rekaman berhenti otomatis setelah (detik)", step: 5, min: 5 },
+  {
+    key: "minClipSec",
+    label: "Klip lebih pendek dari ini tidak diekspor (detik)",
+    step: 0.1,
+    min: 0.1,
+  },
+  { key: "minSnrDb", label: "Peringatan jika SNR di bawah (dB)", step: 1, min: 0 },
 ];
 
 const RATE_OPTIONS = EXPORT_SAMPLE_RATES.map((rate) => ({
@@ -50,6 +58,30 @@ const PRESET_OPTIONS = TRAINER_PRESET_IDS.map((preset) => ({
   value: preset,
   label: TRAINER_PRESETS[preset].label,
 }));
+
+function NumberFields(props: { fields: readonly NumberField[] }): JSX.Element {
+  return (
+    <For each={props.fields}>
+      {(field) => (
+        <label class="flex flex-col gap-1 text-base">
+          {field.label}
+          <Input
+            type="number"
+            step={field.step}
+            min={field.min}
+            max={field.max}
+            value={settings()[field.key]}
+            onChange={(event) => {
+              const value = Number(event.currentTarget.value);
+              if (Number.isFinite(value))
+                void attempt(() => updateSettings({ [field.key]: value }));
+            }}
+          />
+        </label>
+      )}
+    </For>
+  );
+}
 
 export default function SettingsView(): JSX.Element {
   const [preset, setPreset] = createSignal<TrainerPreset>("pocket-tts");
@@ -78,7 +110,7 @@ export default function SettingsView(): JSX.Element {
   return (
     <div class="flex flex-col gap-4">
       <LayerCard class="flex flex-col gap-4">
-        <h2 class="text-lg font-semibold text-kumo-strong">Jendela durasi</h2>
+        <h2 class="text-lg font-semibold text-kumo-strong">Jendela durasi dan target</h2>
         <label class="flex flex-col gap-1 text-base">
           Preset pelatih
           <Select
@@ -86,36 +118,21 @@ export default function SettingsView(): JSX.Element {
             value={preset()}
             onChange={(value) => {
               setPreset(value);
-              attempt(() =>
+              const chosen = TRAINER_PRESETS[value];
+              void attempt(() =>
                 updateSettings({
-                  targetMinSec: TRAINER_PRESETS[value].minSec,
-                  targetMaxSec: TRAINER_PRESETS[value].maxSec,
+                  targetMinSec: chosen.minSec,
+                  targetMaxSec: chosen.maxSec,
+                  targetHours: chosen.targetHours,
                 })
               );
             }}
           />
         </label>
-        <For each={NUMBER_FIELDS}>
-          {(field) => (
-            <label class="flex flex-col gap-1 text-base">
-              {field.label}
-              <Input
-                type="number"
-                step={field.step}
-                min={field.min}
-                max={field.max}
-                value={settings()[field.key]}
-                onChange={(event) => {
-                  const value = Number(event.currentTarget.value);
-                  if (Number.isFinite(value)) attempt(() => updateSettings({ [field.key]: value }));
-                }}
-              />
-            </label>
-          )}
-        </For>
+        <NumberFields fields={WINDOW_FIELDS} />
         <Button
           onClick={() =>
-            attempt(async () => {
+            void attempt(async () => {
               const count = await rebuildScripts();
               showToast(`${count} naskah disusun ulang`, "success");
             })
@@ -132,7 +149,7 @@ export default function SettingsView(): JSX.Element {
           {MIN_CALIBRATION_CLIPS} klip), lalu memakainya untuk perkiraan durasi naskah.
         </p>
         <div class="flex flex-wrap items-center gap-2">
-          <Button onClick={() => attempt(calibrate)}>Hitung dari klip</Button>
+          <Button onClick={() => void attempt(calibrate)}>Hitung dari klip</Button>
           <Show when={fitted()}>
             {(rate) => (
               <>
@@ -140,7 +157,9 @@ export default function SettingsView(): JSX.Element {
                 <Button
                   variant="primary"
                   onClick={() =>
-                    attempt(() => updateSettings({ syllablesPerSecond: Number(rate().toFixed(2)) }))
+                    void attempt(() =>
+                      updateSettings({ syllablesPerSecond: Number(rate().toFixed(2)) })
+                    )
                   }
                 >
                   Terapkan
@@ -151,8 +170,21 @@ export default function SettingsView(): JSX.Element {
         </div>
       </LayerCard>
 
-      <LayerCard class="flex flex-col gap-3">
-        <h2 class="text-lg font-semibold text-kumo-strong">Ekspor dan tampilan</h2>
+      <LayerCard class="flex flex-col gap-4">
+        <h2 class="text-lg font-semibold text-kumo-strong">Audio dan kualitas</h2>
+        <NumberFields fields={AUDIO_FIELDS} />
+        <Switch
+          checked={settings().rejectClipped}
+          onChange={(checked) => void attempt(() => updateSettings({ rejectClipped: checked }))}
+          label="Rekaman yang terpotong (clipping) tidak bisa disimpan"
+        />
+        <Switch
+          checked={settings().normalizePeakDbfs !== null}
+          onChange={(checked) =>
+            void attempt(() => updateSettings({ normalizePeakDbfs: checked ? -3 : null }))
+          }
+          label="Normalisasi puncak ke -3 dBFS saat ekspor (DC offset selalu dihilangkan)"
+        />
         <label class="flex flex-col gap-1 text-base">
           Laju sampel ekspor
           <Select
@@ -160,13 +192,14 @@ export default function SettingsView(): JSX.Element {
             value={String(settings().exportSampleRate)}
             onChange={(value) => {
               const rate = EXPORT_SAMPLE_RATES.find((candidate) => String(candidate) === value);
-              if (rate !== undefined) attempt(() => updateSettings({ exportSampleRate: rate }));
+              if (rate !== undefined)
+                void attempt(() => updateSettings({ exportSampleRate: rate }));
             }}
           />
         </label>
         <Switch
           checked={settings().showPhonemes}
-          onChange={(checked) => attempt(() => updateSettings({ showPhonemes: checked }))}
+          onChange={(checked) => void attempt(() => updateSettings({ showPhonemes: checked }))}
           label="Tampilkan fonem di bawah naskah"
         />
       </LayerCard>

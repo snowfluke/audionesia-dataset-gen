@@ -13,6 +13,8 @@ const VARIANTS = {
   secondary:
     "bg-kumo-base !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:bg-kumo-base/50 disabled:!text-kumo-default/70 ring-kumo-line",
   ghost: "text-kumo-default hover:bg-kumo-tint shadow-none bg-inherit",
+  success:
+    "bg-kumo-success text-white ring ring-kumo-success not-disabled:hover:opacity-90 disabled:opacity-50",
   destructive: "bg-kumo-danger !text-white ring ring-kumo-danger disabled:opacity-50",
   outline:
     "bg-transparent text-kumo-default ring ring-kumo-line not-disabled:hover:text-kumo-strong not-disabled:hover:ring-kumo-hairline",
