@@ -9,14 +9,14 @@ import Switch from "../../components/switch.tsx";
 import { attempt } from "../../components/toast.tsx";
 import type { ExportFormat } from "../../lib/export/export.ts";
 import { EXPORT_FORMATS } from "../../lib/export/export.ts";
-import { formatCount } from "../../lib/format.ts";
 import { settings, updateSettings } from "../settings/settings.store.ts";
 import type { DatasetStore } from "./dataset.store.ts";
+import ExportTree from "./export-tree.tsx";
 
 const FORMAT_LABELS = {
-  hf: "metadata.jsonl (Hugging Face audiofolder, dengan kolom split)",
-  styletts2: "styletts2/train_list.txt, val_list.txt, OOD_texts.txt",
-  "pocket-tts": "pocket-tts/train.jsonl, valid.jsonl",
+  hf: "Hugging Face audiofolder (metadata.jsonl dengan kolom split)",
+  styletts2: "StyleTTS2 (train_list.txt, val_list.txt, OOD_texts.txt)",
+  "pocket-tts": "PocketTTS (train.jsonl, valid.jsonl)",
 } as const satisfies Record<ExportFormat, string>;
 
 export type ExportPanelProps = { store: DatasetStore };
@@ -28,31 +28,37 @@ export default function ExportPanel(props: ExportPanelProps): JSX.Element {
       <LayerCard class="flex flex-col gap-3">
         <h2 class="text-lg font-semibold text-kumo-strong">Ekspor dataset</h2>
         <p class="text-base text-kumo-subtle">
-          Hanya klip yang disetujui yang diekspor, sebagai WAV mono 16-bit{" "}
-          {formatCount(settings().exportSampleRate)} Hz
-          {settings().normalizePeakDbfs === null
-            ? ""
-            : ` dengan puncak ${settings().normalizePeakDbfs} dBFS`}{" "}
-          ke dataset/audio/&lt;pembicara&gt;/clip_0001.wav beserta speakers.jsonl, manifest.json,
-          dan ATTRIBUTION.md.
+          Hanya klip yang disetujui yang diekspor. speakers.jsonl, manifest.json, dan ATTRIBUTION.md
+          selalu ditulis; format pelatih di bawah ini menambah berkasnya. Struktur folder yang
+          dihasilkan mengikuti pilihan Anda.
         </p>
-        <div class="flex flex-col gap-2">
-          <For each={EXPORT_FORMATS}>
-            {(format) => (
-              <Switch
-                checked={props.store.formats().has(format)}
-                onChange={() => props.store.toggleFormat(format)}
-                label={FORMAT_LABELS[format]}
-              />
-            )}
-          </For>
-          <Switch
-            checked={settings().licenseMode === "cc0"}
-            onChange={(checked) =>
-              void attempt(() => updateSettings({ licenseMode: checked ? "cc0" : "all" }))
-            }
-            label="Hanya klip dengan teks CC0 (Common Voice dan teks buatan), untuk dataset yang akan dipublikasikan"
-          />
+        <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+          <div class="flex flex-col gap-2">
+            <For each={EXPORT_FORMATS}>
+              {(format) => (
+                <Switch
+                  checked={props.store.formats().has(format)}
+                  onChange={() => props.store.toggleFormat(format)}
+                  label={FORMAT_LABELS[format]}
+                />
+              )}
+            </For>
+            <Switch
+              checked={settings().licenseMode === "cc0"}
+              onChange={(checked) =>
+                void attempt(() => updateSettings({ licenseMode: checked ? "cc0" : "all" }))
+              }
+              label="Hanya klip dengan teks CC0 (Common Voice dan teks buatan), untuk dataset yang akan dipublikasikan"
+            />
+            <Switch
+              checked={settings().normalizePeakDbfs !== null}
+              onChange={(checked) =>
+                void attempt(() => updateSettings({ normalizePeakDbfs: checked ? -3 : null }))
+              }
+              label="Normalisasi puncak ke -3 dBFS (DC offset selalu dihilangkan)"
+            />
+          </div>
+          <ExportTree store={props.store} />
         </div>
         <div class="flex flex-wrap gap-2">
           <Button
@@ -104,8 +110,8 @@ export default function ExportPanel(props: ExportPanelProps): JSX.Element {
         <p class="text-base text-kumo-subtle">
           Whisper ({settings().asrModel.replace("onnx-community/", "")}) berjalan di peramban dan
           menulis ulang setiap klip yang menunggu; klip yang berbeda lebih dari{" "}
-          {Math.round(settings().asrCerWarn * 100)}% dari naskahnya diberi tanda di tab Dengarkan.
-          Model diunduh sekali dan disimpan peramban.
+          {Math.round(settings().asrCerWarn * 100)}% dari naskahnya diberi tanda di tab Dengarkan
+          dan Klip. Model diunduh sekali dan disimpan peramban.
         </p>
         <Button
           disabled={busy()}
@@ -116,57 +122,6 @@ export default function ExportPanel(props: ExportPanelProps): JSX.Element {
         >
           Periksa semua klip menunggu
         </Button>
-      </LayerCard>
-
-      <LayerCard class="flex flex-col gap-3">
-        <h2 class="text-lg font-semibold text-kumo-strong">Cadangan</h2>
-        <p class="text-base text-kumo-subtle">
-          Peramban bisa menghapus penyimpanan lokal kapan saja. Cadangan menyimpan pembicara, semua
-          klip beserta audio aslinya, naskah yang dilewati, pengaturan, dan teks dari tab Tulis.
-          Memulihkan cadangan menambahkan apa yang belum ada tanpa menimpa klip yang sudah
-          tersimpan.
-        </p>
-        <div class="flex flex-wrap gap-2">
-          <Button
-            disabled={busy() || !props.store.canPickDirectory()}
-            onClick={() => {
-              const store = props.store;
-              void attempt(() => store.backupTo("folder"));
-            }}
-          >
-            Cadangkan ke folder
-          </Button>
-          <Button
-            disabled={busy()}
-            onClick={() => {
-              const store = props.store;
-              void attempt(() => store.backupTo("zip"));
-            }}
-          >
-            Cadangkan sebagai ZIP
-          </Button>
-          <Button
-            variant="outline"
-            disabled={busy() || !props.store.canPickDirectory()}
-            onClick={() => void attempt(props.store.restoreFromFolder)}
-          >
-            Pulihkan dari folder
-          </Button>
-          <label class="inline-flex cursor-pointer items-center text-base text-kumo-link">
-            Pulihkan dari ZIP
-            <input
-              type="file"
-              accept=".zip"
-              class="hidden"
-              disabled={busy()}
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                if (file !== undefined) void attempt(() => props.store.restoreFromZip(file));
-                event.currentTarget.value = "";
-              }}
-            />
-          </label>
-        </div>
       </LayerCard>
     </>
   );
