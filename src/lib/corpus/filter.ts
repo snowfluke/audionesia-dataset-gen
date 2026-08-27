@@ -1,5 +1,7 @@
 const MIN_CHARS = 10;
 const MAX_CHARS = 400;
+/** One- to three-word fragments read badly and add little coverage. */
+const MIN_WORDS = 4;
 const MIN_LETTERS = 3;
 const MAX_DIGIT_RATIO = 0.2;
 const MAX_CAPITAL_RATIO = 0.3;
@@ -27,6 +29,7 @@ export function normalizeSentence(text: string): string {
 
 export type RejectReason =
   | "too-short"
+  | "too-few-words"
   | "too-long"
   | "non-ascii"
   | "markup"
@@ -48,6 +51,7 @@ export function rejectReason(text: string): RejectReason | null {
   if (digits.length / text.length > MAX_DIGIT_RATIO) return "too-many-digits";
   const capitals = text.match(/[A-Z]/g) ?? [];
   if (capitals.length / letters.length > MAX_CAPITAL_RATIO) return "too-many-capitals";
+  if (text.split(" ").length < MIN_WORDS) return "too-few-words";
   return null;
 }
 

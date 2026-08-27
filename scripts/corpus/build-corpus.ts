@@ -3,7 +3,13 @@ import { Glob } from "bun";
 import { VERSION, explain, toPhoneme } from "indo-g2p";
 
 import { attributionMarkdown } from "../../src/lib/corpus/attribution.ts";
-import { createUnitTable, internUnit, unitLabels } from "../../src/lib/corpus/coverage.ts";
+import {
+  FOREIGN_SHARE,
+  createUnitTable,
+  englishShare,
+  internUnit,
+  unitLabels,
+} from "../../src/lib/corpus/coverage.ts";
 import { dedupKey, normalizeSentence, rejectReason } from "../../src/lib/corpus/filter.ts";
 import type {
   CorpusSource,
@@ -25,9 +31,11 @@ const MAX_SYLLABLES_PER_ENTRY = Math.round(30 * DEFAULT_SYLLABLES_PER_SECOND);
 type Analyzed = { text: string; phonemes: string; syllables: number; labels: string[] };
 type SourceTally = { license: string; count: number };
 
-function analyze(sentence: string): Analyzed {
+/** Null when indo-g2p reads most of the words as English: a quote or caption in another language. */
+function analyze(sentence: string): Analyzed | null {
   const result = toPhoneme(sentence);
   const traces = explain(sentence);
+  if (englishShare(traces) >= FOREIGN_SHARE) return null;
   const syllables = result.syllables.filter((syllable) => syllable !== " ").length;
   const labels = unitLabels(sentence, result.phonemes, traces);
   return { text: sentence, phonemes: result.phonemes, syllables, labels };
@@ -96,7 +104,12 @@ for (const file of files) {
         continue;
       }
       seen.add(key);
-      accepted.push(analyze(sentence));
+      const analyzed = analyze(sentence);
+      if (analyzed === null) {
+        tally(rejected, "foreign");
+        continue;
+      }
+      accepted.push(analyzed);
     }
     const runs = isParagraph
       ? packByTotal(accepted, (entry) => entry.syllables, MAX_SYLLABLES_PER_ENTRY)

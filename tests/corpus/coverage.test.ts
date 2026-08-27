@@ -5,6 +5,7 @@ import type { Phenomenon } from "../../src/lib/corpus/coverage.ts";
 import {
   createUnitTable,
   detectPhenomena,
+  englishShare,
   internUnit,
   phoneUnits,
   tokenizePhones,
@@ -61,6 +62,19 @@ describe("detectPhenomena", () => {
   it("flags questions, quotes, commas, and abbreviations", () => {
     const found = detectPhenomena('Apa kabar, Bu, "PT KAI"?', "apa kabar, bu, pt kai?", []);
     expect(found).toEqual(["abbreviation", "question", "commas", "quote"]);
+  });
+});
+
+describe("englishShare", () => {
+  it("is the share of words read as English", () => {
+    const traces: WordTrace[] = [
+      { word: "we", phonemes: "wi", source: "english" },
+      { word: "ask", phonemes: "æsk", source: "english" },
+      { word: "prabowo", phonemes: "prabowo", source: "lexicon" },
+      { word: "to", phonemes: "tu", source: "english" },
+    ];
+    expect(englishShare(traces)).toBe(0.75);
+    expect(englishShare([])).toBe(0);
   });
 });
 

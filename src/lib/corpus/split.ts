@@ -39,12 +39,15 @@ const ABBREVIATIONS = new Set([
 const CLOSERS = /["')\]]/;
 const SENTENCE_START = /[A-Z"'(]/;
 
+/** `A.`, `B.J.`, `R.A.` and similar runs of dotted initials. */
+const INITIALS = /^(?:[A-Za-z]\.)*[A-Za-z]$/;
+
 function isAbbreviation(text: string, dotIndex: number): boolean {
   const before = text.slice(0, dotIndex).match(/([A-Za-z.]+)$/);
   if (before === null) return false;
-  const word = (before[1] ?? "").replace(/\.$/, "").toLowerCase();
-  if (word.length === 1) return true;
-  return ABBREVIATIONS.has(word);
+  const word = (before[1] ?? "").replace(/\.$/, "");
+  if (INITIALS.test(word)) return true;
+  return ABBREVIATIONS.has(word.toLowerCase());
 }
 
 /**

@@ -17,6 +17,13 @@ describe("splitSentences", () => {
       "Dr. Budi datang.",
       "Ia membawa No. 5 dan A. Rahman.",
     ]);
+    expect(splitSentences("B.J. Habibie adalah Presiden ketiga Indonesia.")).toEqual([
+      "B.J. Habibie adalah Presiden ketiga Indonesia.",
+    ]);
+    expect(splitSentences("R.A. Kartini lahir di Jepara. Ia pahlawan.")).toEqual([
+      "R.A. Kartini lahir di Jepara.",
+      "Ia pahlawan.",
+    ]);
   });
 
   it("keeps closing quotes with their sentence", () => {

@@ -29,12 +29,19 @@ export async function fetchPoolRows(
 
   const take = async (line: string): Promise<void> => {
     if (line.trim() === "") return;
-    const parsed = poolSentenceSchema.safeParse(JSON.parse(line));
-    if (!parsed.success) {
+    let row: PoolSentence;
+    try {
+      const parsed = poolSentenceSchema.safeParse(JSON.parse(line));
+      if (!parsed.success) {
+        rejected += 1;
+        return;
+      }
+      row = parsed.data;
+    } catch {
       rejected += 1;
       return;
     }
-    batch.push(parsed.data);
+    batch.push(row);
     accepted += 1;
     if (batch.length >= batchSize) {
       await onBatch(batch);

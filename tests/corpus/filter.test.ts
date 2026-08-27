@@ -18,9 +18,11 @@ describe("rejectReason", () => {
     expect(rejectReason("Harga Rp15.000 naik 5% tahun ini.")).toBeNull();
   });
 
-  it("rejects by length", () => {
+  it("rejects by length and by word count", () => {
     expect(rejectReason("Halo.")).toBe("too-short");
     expect(rejectReason("Saya ".repeat(100))).toBe("too-long");
+    expect(rejectReason("Selamat pagi semua.")).toBe("too-few-words");
+    expect(rejectReason("Selamat pagi semua orang.")).toBeNull();
   });
 
   it("rejects text indo-g2p cannot read", () => {

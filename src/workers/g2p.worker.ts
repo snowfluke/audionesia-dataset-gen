@@ -1,6 +1,6 @@
 import { VERSION, explain, toPhoneme } from "indo-g2p";
 
-import { unitLabels } from "../lib/corpus/coverage.ts";
+import { englishShare, unitLabels } from "../lib/corpus/coverage.ts";
 import type { PhonemizeRequest, PhonemizeResponse, Phonemized } from "../lib/g2p/messages.ts";
 
 function phonemizeOne(text: string): Phonemized {
@@ -11,6 +11,7 @@ function phonemizeOne(text: string): Phonemized {
     phonemes: result.phonemes,
     syllables: result.syllables.filter((syllable) => syllable !== " ").length,
     labels: unitLabels(text, result.phonemes, traces),
+    englishShare: englishShare(traces),
   };
 }
 
