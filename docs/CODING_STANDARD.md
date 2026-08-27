@@ -104,13 +104,13 @@ export function isEnglishLoan(trace) {
 
 Where a shape lives:
 
-| Shape                                                | File                                             |
-| ---------------------------------------------------- | ------------------------------------------------ |
-| IndexedDB rows (`Speaker`, `Clip`, `ScriptRow`, ...) | `src/lib/db/schema.ts`                           |
-| Imported sentence line, corpus pool line             | `src/lib/corpus/schema.ts`                       |
-| Worker message contracts                             | `src/lib/<worker>/messages.ts`                   |
-| Export line shapes                                   | `src/lib/export/<format>.ts`, next to the writer |
-| Settings                                             | `src/lib/settings.ts`                            |
+| Shape                                                  | File                                             |
+| ------------------------------------------------------ | ------------------------------------------------ |
+| IndexedDB rows (`Workspace`, `Clip`, `ScriptRow`, ...) | `src/lib/db/schema.ts`                           |
+| Imported sentence line, corpus pool line               | `src/lib/corpus/schema.ts`                       |
+| Worker message contracts                               | `src/lib/<worker>/messages.ts`                   |
+| Export line shapes                                     | `src/lib/export/<format>.ts`, next to the writer |
+| Settings                                               | `src/lib/settings.ts`                            |
 
 ## 3. Application Structure
 
@@ -222,10 +222,10 @@ createEffect(() => {
 
 - One database, `audionesia`. The schema is a typed `DBSchema` in `src/lib/db/schema.ts`; the version number lives next to it.
 - Every schema change bumps the version and adds a step to the `upgrade` callback that migrates existing rows. Never delete a store in `upgrade` without moving its rows first.
-- Store names are lowercase plural nouns: `speakers`, `sentences`, `scripts`, `clips`, `audio`, `skips`, `settings`.
+- Store names are lowercase plural nouns: `workspaces`, `sentences`, `scripts`, `clips`, `audio`, `skips`, `settings`, `units`.
 - One repository per store: `src/lib/db/<store>.repository.ts`. It owns every query for that store and exports async functions. No business logic here.
 - Audio blobs live in the `audio` store, keyed by clip id, separate from clip metadata, so listing clips never loads audio.
-- A write that touches more than one store runs in one transaction. Example: saving a clip writes `clips` and `audio`, and bumps `speakers.nextSeq`, in one `readwrite` transaction.
+- A write that touches more than one store runs in one transaction. Example: saving a clip writes `clips` and `audio`, and bumps `workspaces.nextSeq`, in one `readwrite` transaction.
 - `navigator.storage.persist()` is requested before the first write.
 - Rows the app wrote are trusted by their schema version. Data from outside (imported files, the corpus pool, pasted text, backup files) is parsed with Zod before it reaches a repository.
 - Settings are validated with `appSettingsSchema` on every write (`updateSettings`); on read, invalid fields fall back to defaults one by one, never the whole row.
@@ -233,11 +233,11 @@ createEffect(() => {
 ```typescript
 // Correct
 export async function saveClip(clip: Clip, wav: Blob): Promise<void> {
-  const tx = (await db()).transaction(["clips", "audio", "speakers"], "readwrite");
+  const tx = (await db()).transaction(["clips", "audio", "workspaces"], "readwrite");
   await Promise.all([
     tx.objectStore("clips").put(clip),
     tx.objectStore("audio").put({ clipId: clip.id, blob: wav }),
-    bumpSequence(tx.objectStore("speakers"), clip.speakerId),
+    bumpSequence(tx.objectStore("workspaces"), clip.workspaceId),
     tx.done,
   ]);
 }
@@ -335,7 +335,7 @@ All code identifiers are English. UI labels are Bahasa Indonesia string literals
 
 ## 10. Localization and User-Facing Copy
 
-- UI strings are Bahasa Indonesia. Tab names: `Rekam`, `Dengarkan`, `Tulis`, `Dataset`, `Pengaturan`.
+- UI strings are Bahasa Indonesia. The home page lists datasets; tab names inside one: `Rekam`, `Dengarkan`, `Klip`, `Teks sendiri`, `Dataset`, `Pengaturan`.
 - No i18n library. Copy lives in the view that uses it.
 - Numbers use the `id-ID` locale (`1.234,5`). Durations show one decimal and the unit: `12,3 s`.
 - Dataset files, manifests, field names, and log messages are English.
@@ -354,10 +354,12 @@ These rules protect the training data. Breaking one produces a dataset that look
 - `hash` is the first 16 hex characters of SHA-256 over the exported WAV bytes (after resampling), never over the stored master.
 - Train or validation membership is `splitFor(clipId)`, a hash of the clip id. Never assign a split by position in a list.
 - Export removes the DC offset and normalizes the peak to `settings.normalizePeakDbfs`; clips under `settings.minClipSec` are skipped and listed in `export-warnings.txt`.
-- StyleTTS2 `speaker_id` is the index in `createdAt` order; `listSpeakers` sorts, never the caller.
+- StyleTTS2 `speaker_id` is the workspace's index in `createdAt` order; `listWorkspaces` sorts, never the caller.
+- A workspace holds one speaker; export is per workspace and the folder writer prunes only that speaker's audio folder.
+- `setClipStatus` owns every status transition and its guard; a rejected clip returns to approved only while its audio row exists.
 - A clipped take cannot be saved while `rejectClipped` is on. `snrDb` is measured from the leading silence of the take.
 - Scripts never mix text sources. `rebuildScripts` keeps old scripts that clips reference, so `clip.scriptId` never dangles.
-- Seeding is complete only when the `library` settings row matches the served `index.json`; a mismatch reseeds and remaps Tulis sentences.
+- Seeding is complete only when the `library` settings row matches the served `index.json`; a mismatch reseeds and remaps Teks sendiri sentences.
 - The ASR check (`lib/asr`) stores `asrText` and `asrCer` on the clip; it flags, it never changes a clip's status.
 - `path` is `dataset/audio/<speaker>/clip_<seq>.wav` with `seq` zero-padded to four digits per speaker.
 - Export formats are pure line serializers in `src/lib/export/` that take rows and return strings; one `DatasetWriter` (folder or zip) writes bytes. Serializers never touch the file system.

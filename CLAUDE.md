@@ -84,7 +84,7 @@ Name the terminal states.
 
 ## Project Overview
 
-**Audionesia** is a static SolidJS 2.0 web app that builds an Indonesian text-to-speech training dataset. It ships a phoneme-balanced reading corpus, records raw PCM in the browser, stores everything in IndexedDB, and exports the `dataset/` layout plus StyleTTS2 and PocketTTS manifests. There is no server. GitHub Pages hosts the built `dist/`.
+**Audionesia Dataset Generator** is a static SolidJS 2.0 web app that builds an Indonesian text-to-speech training dataset. It ships a phoneme-balanced reading corpus, records raw PCM in the browser, stores everything in IndexedDB, and exports the `dataset/` layout plus StyleTTS2 and PocketTTS manifests. There is no server. GitHub Pages hosts the built `dist/`.
 
 | Layer      | Tech                                                                                          |
 | ---------- | --------------------------------------------------------------------------------------------- |
@@ -110,9 +110,10 @@ audionesia-dataset-gen/
     main.tsx  app.tsx              # mount; header, speaker picker, tabs, help dialogs
     components/                    # one Solid component per file, Kumo class strings
     features/
-      record/   review/   write/   # Rekam, Dengarkan, Tulis: <feature>.store.ts + .view.tsx
+      record/   review/   clips/   # Rekam, Dengarkan, Klip: <feature>.store.ts + .view.tsx
+      write/                       # Teks sendiri: own text, sample files, scripts first in the queue
       dataset/  settings/          # Dataset (stats, export), Pengaturan (knobs)
-      speakers/ library/           # global stores: speakers, pool seeding, script build
+      workspaces/ library/         # home page, workspace + tab stores; pool seeding, script build
     lib/
       asr/                         # Whisper worker client, clip check with character error rate
       audio/                       # wav-encode, trim-silence (SNR), level, normalize, resample, playback
@@ -136,7 +137,9 @@ audionesia-dataset-gen/
 
 ## Boundaries
 
-**Tabs (Bahasa Indonesia):** `Rekam` (record), `Dengarkan` (review), `Tulis` (add text), `Dataset` (stats, export), `Pengaturan` (settings).
+**Home:** the list of workspaces (`features/workspaces/home.view.tsx`). A workspace is one dataset: a name, one speaker with consent, `targetHours`, and the `clip_XXXX` counter. `+ Dataset baru` creates one; backup and restore of every workspace live here.
+
+**Tabs inside a workspace (Bahasa Indonesia):** `Rekam` (record), `Dengarkan` (review), `Klip` (clip list), `Teks sendiri` (add text), `Dataset` (stats, export), `Pengaturan` (settings). The tab signal lives in `navigation.store.ts`; `openWorkspace` resets it to `Rekam`.
 
 **Clip status machine** (`src/lib/db/schema.ts`):
 
@@ -146,9 +149,10 @@ audionesia-dataset-gen/
 | `pending`  | `approved` | reviewer (`Ya`)    | none                        |
 | `pending`  | `rejected` | reviewer (`Tidak`) | none                        |
 | `approved` | `rejected` | reviewer           | none                        |
+| `rejected` | `approved` | reviewer           | audio row still exists      |
 | any        | (deleted)  | `deleteClip`       | audio row deleted with it   |
 
-Terminal for export: `approved` exports, `rejected` never does. Script status per speaker is derived from clips and skips, never stored.
+Terminal for export: `approved` exports, `rejected` never does. `setClipStatus` enforces the guard. Script status per workspace is derived from clips and skips, never stored.
 
 **Data flow:** `scripts/corpus/build-corpus.ts` (offline) -> `public/corpus/pool.jsonl` -> seeded into IndexedDB on first run -> `builder.worker.ts` builds scripts -> Rekam saves clips + WAV masters -> Dengarkan approves -> `lib/export` resamples, hashes, and writes.
 
@@ -170,7 +174,7 @@ components  <-  features/*.view.tsx  ->  features/*.store.ts  ->  lib/*  ->  wor
 ```
 
 - Views hold JSX and view-local state. No IndexedDB, audio API, `fetch`, or `postMessage` in a view.
-- Feature stores own state and actions. Global stores (`speakers`, `settings`, `library`) are module-level signals; per-tab stores are `create<Feature>Store()` factories called in the view so `createMemo` and `onCleanup` have an owner.
+- Feature stores own state and actions. Global stores (`workspaces`, `navigation`, `settings`, `library`) are module-level signals; per-tab stores are `create<Feature>Store()` factories called in the view so `createMemo` and `onCleanup` have an owner.
 - `lib/audio` (except `resample.ts`, `playback.ts`), `lib/corpus` (except `pool-loader.ts`), `lib/export/manifest.ts`, `lib/export/styletts2-symbols.ts`, `lib/duration.ts`, `lib/hash.ts`, `lib/slug.ts` are pure and tested with `bun test`. Keep DOM out of them.
 - Workers import from `lib/` only. One typed message contract per worker; the main thread goes through `callWorker` in `lib/worker-rpc.ts`.
 - `components/` never imports from `features/`.
@@ -261,9 +265,11 @@ Identifiers English. UI copy Bahasa Indonesia, in view files. Thrown `Error` mes
 - StyleTTS2: map `-` to space, strip `'()`, `é` to `e`, refuse lines over 500 phoneme chars, skip speakers with fewer than 2 clips, `speaker_id` = creation index, `root_path` = `dataset/`. PocketTTS: `{"path","duration","transcript"}` with 30 s max.
 - Every phoneme string travels with its `g2pVersion`; clips freeze `text` and `phonemes` at record time.
 - Script id = hash of its sentence ids; `rebuildScripts` keeps old scripts that clips still reference, so a clip never dangles. Scripts never mix text sources (`DEFAULT_SAME_SOURCE_TOLERANCE = 0`).
-- Seeding is complete only when the `library` row in `settings` matches the served `index.json` (`poolCount`, `g2pVersion`); a mismatch reseeds and remaps Tulis sentences onto the new unit table.
+- Seeding is complete only when the `library` row in `settings` matches the served `index.json` (`poolCount`, `g2pVersion`); a mismatch reseeds and remaps Teks sendiri sentences onto the new unit table.
 - A clipped take cannot be saved while `settings.rejectClipped` is on; `snrDb` comes from the leading silence of the take.
-- StyleTTS2 `speaker_id` = index in `createdAt` order (`listSpeakers` sorts); speakers carry optional gender, age range, dialect, microphone, and `consentAt`.
+- StyleTTS2 `speaker_id` = the workspace's index in `createdAt` order (`listWorkspaces` sorts); the speaker carries optional gender, age range, dialect, microphone, and `consentAt`.
+- Export is per workspace (`exportDataset({ workspaceId })`): one speaker folder, its own `speakers.jsonl`; the folder writer prunes only `dataset/audio/<speaker>`.
+- Scripts made only of `user` sentences sort first in `rebuildScripts`, so Teks sendiri text is recorded before the pool.
 - Coverage units are `p:<phone>`, `d:<a>.<b>` (with `#` boundary), `f:<phenomenon>`; ids index the `units` store and `index.json`.
 - Duration window and syllable rate are settings with presets (`pocket-tts` 10-30 s, `styletts2` 5-15 s). Default `syllablesPerSecond` 4.5 is a calibration knob, fitted from approved clips.
 
@@ -276,7 +282,7 @@ Identifiers English. UI copy Bahasa Indonesia, in view files. Thrown `Error` mes
 ## Database
 
 - Schema and version in `src/lib/db/schema.ts`; every change bumps `DB_VERSION` and adds a migration step in `database.ts`.
-- One repository per store; multi-store writes in one transaction (`saveClip` writes `clips`, `audio`, `speakers` together).
+- One repository per store; multi-store writes in one transaction (`saveClip` writes `clips`, `audio`, `workspaces` together).
 - Audio blobs live only in `audio`, keyed by clip id.
 
 ## Git
@@ -306,15 +312,15 @@ Identifiers English. UI copy Bahasa Indonesia, in view files. Thrown `Error` mes
 If context was compacted, re-verify:
 
 - [ ] Solid **2.0 RC** (`2.0.0-rc.3`), `jsxImportSource: "@solidjs/web"`, two-argument `createEffect`, async `createMemo` + `<Loading>`/`<Errored>`.
-- [ ] No router. Five tabs: Rekam, Dengarkan, Tulis, Dataset, Pengaturan.
+- [ ] No router. Home lists workspaces; six tabs inside one: Rekam, Dengarkan, Klip, Teks sendiri, Dataset, Pengaturan.
 - [ ] Raw PCM via AudioWorklet; `getUserMedia` constraints off; master WAV at capture rate; export at `exportSampleRate`.
 - [ ] `hash` from exported bytes, 16 hex; `path` `dataset/audio/<speaker>/clip_0001.wav`; `speakers.jsonl` shape fixed.
 - [ ] Only `approved` clips export; StyleTTS2 needs 2 clips per speaker and lines under 500 chars; PocketTTS max 30 s.
 - [ ] Pool is generated offline (`corpus:*` then `corpus:build`) and committed under `public/corpus/`; `corpus/raw/` is not.
 - [ ] `g2pVersion` stamped on pool rows, scripts, and clips; script ids hash their sentence ids.
-- [ ] IndexedDB `audionesia` v1 stores: speakers, sentences, scripts, clips, audio, skips, settings (`app` + `library` rows), units.
-- [ ] Train/validation split hashes the clip id; speakers order by `createdAt`; rebuilds keep referenced scripts; scripts are single-source.
-- [ ] Backup = speakers, clips + master WAVs, skips, settings, Tulis sentences (`lib/backup`); restore merges, never overwrites.
+- [ ] IndexedDB `audionesia` v2 stores: workspaces (speaker + `targetHours` + `nextSeq`), sentences, scripts, clips (`workspaceId` + `speakerId`), audio, skips (`[workspaceId, scriptId]`), settings (`app` + `library` rows), units. v1 speakers migrate to workspaces in `database.ts`.
+- [ ] Train/validation split hashes the clip id; workspaces order by `createdAt`; rebuilds keep referenced scripts and put user-text scripts first; scripts are single-source.
+- [ ] Backup (version 2) = workspaces, clips + master WAVs, skips, settings, Teks sendiri sentences (`lib/backup`); restore merges, never overwrites.
 - [ ] ASR check = Whisper in `asr.worker.ts`, 16 kHz input, CER via `lib/text/cer.ts`, results on `clip.asrCer` / `clip.asrText`.
 - [ ] Settings presets: `pocket-tts` 10-30 s (default), `styletts2` 5-15 s; syllable rate 4.5 default, fitted per speaker.
 - [ ] Kumo look, hand-rolled Solid components; `data-mode` dark mode; 14 px body text, sentence-case headings, `font-semibold`.

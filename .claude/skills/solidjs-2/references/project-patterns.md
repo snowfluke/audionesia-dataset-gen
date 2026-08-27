@@ -12,7 +12,7 @@ Views hold JSX and view-local state. Stores own feature state and every action. 
 
 ## Global stores: module-level signals, no memos
 
-`features/speakers/speakers.store.ts`, `features/settings/settings.store.ts`, `features/library/library.store.ts` create signals at module scope and export accessors plus async actions. They never create memos or effects, because there is no owner at module scope.
+`features/workspaces/workspaces.store.ts`, `features/settings/settings.store.ts`, `features/library/library.store.ts` create signals at module scope and export accessors plus async actions. They never create memos or effects, because there is no owner at module scope.
 
 ```ts
 const [settings, setSettings] = createSignal<AppSettings>(DEFAULT_SETTINGS);
@@ -39,9 +39,9 @@ export type ReviewStore = {
 export function createReviewStore(): ReviewStore {
   const pending = createMemo(async (): Promise<Clip[]> => {
     clipsVersion();                       // dependency: re-run after any clip write
-    const speakerId = currentSpeakerId();
-    if (speakerId === null) return [];
-    return listClipsBySpeakerStatus(speakerId, "pending");
+    const workspace = currentWorkspace();
+    if (workspace === null) return [];
+    return listClipsByWorkspaceStatus(workspace.id, "pending");
   });
   const current = (): Clip | undefined => pending()[0];
   async function decide(status: ClipStatus): Promise<void> {

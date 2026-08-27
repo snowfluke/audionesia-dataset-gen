@@ -10,13 +10,16 @@ Build an Indonesian text-to-speech training dataset in the browser. Audionesia s
 
 ## What it does
 
-| Tab          | Job                                                                                                                                         |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Rekam`      | One script at a time, microphone picker, level meter, raw capture with browser audio processing off, silence trim, waveform of the take.    |
-| `Dengarkan`  | Play each clip; `Ya` approves, `Tidak` rejects. Filters for pending, approved, and rejected clips; re-queue a script; optional ASR check.   |
-| `Tulis`      | Paste or drop your own text (`.txt`, `.tsv`, `.jsonl`); it is filtered, phonemized, and added to the pool.                                  |
-| `Dataset`    | Progress toward a target, coverage of phones, diphones, and spelling phenomena, export, backup and restore, ASR check of all pending clips. |
-| `Pengaturan` | Trainer presets, duration window, silence and clipping gates, export sample rate and peak level, speech-rate calibration, ASR model.        |
+The home page lists datasets as folders. Each dataset has a name, one speaker, a target in hours, and a progress bar of approved recording time. Open a dataset to work in its tabs:
+
+| Tab            | Job                                                                                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Rekam`        | One script at a time, microphone picker, level meter, raw capture with browser audio processing off, silence trim, waveform of the take. Scripts built from your own text come first.  |
+| `Dengarkan`    | Play each clip; `Ya` approves, `Tidak` rejects. Filters for pending, approved, and rejected clips; re-queue a script; optional ASR check.                                              |
+| `Klip`         | Every recorded item of the dataset: file name, status, duration, SNR, ASR difference, text; play, approve, reject, or delete each one.                                                 |
+| `Teks sendiri` | Paste or drop your own text (`.txt`, `.tsv`, `.jsonl`, sample files to download); it is filtered, phonemized, added to the pool, and its scripts go to the front of the `Rekam` queue. |
+| `Dataset`      | Progress toward the dataset's target, coverage of phones, diphones, and spelling phenomena, export with a preview of the folder tree, ASR check of all pending clips.                  |
+| `Pengaturan`   | Trainer presets, duration window, silence and clipping gates, export sample rate and peak level, speech-rate calibration, ASR model.                                                   |
 
 Scripts are built by a greedy set cover over the pool's coverage units, so the rarest sounds are read first; each script stays within one text source so it reads as one voice. Phonemes come from [indo-g2p](https://github.com/snowfluke/indo-g2p), and every phoneme string is stored with the library version that produced it.
 
@@ -25,7 +28,7 @@ Scripts are built by a greedy set cover over the pool's coverage units, so the r
 - **StyleTTS2** ships an English-only PL-BERT ("it probably does not work very well on other languages", per its README). Train or find an Indonesian PL-BERT before fine-tuning on this dataset. StyleTTS2 also crops training audio to 5 s by default and rejects phoneme strings over 512 tokens, so pick the `StyleTTS2 (5-15 s)` preset in `Pengaturan` and rebuild scripts before recording for it.
 - **PocketTTS** has no Indonesian model; its new-language path needs an Indonesian tokenizer and a forced aligner (see its `training/README.md`), and its authors size such a run at 100 hours or more. The default `PocketTTS (10-30 s)` preset targets it.
 - **Licensing.** Only Common Voice (CC0) and generated text are free of obligations. Tatoeba text is CC BY 2.0 FR and Wikipedia text is CC BY-SA 4.0; a dataset or model built on them carries attribution and, for BY-SA, share-alike questions. `Pengaturan` has a CC0-only export mode, and every export writes `ATTRIBUTION.md`.
-- **Back up.** Browsers can evict local storage. The Dataset tab backs up every clip's master audio to a folder or ZIP and restores it on any machine.
+- **Back up.** Browsers can evict local storage. The home page backs up every dataset with its clips' master audio to a folder or ZIP and restores them on any machine.
 
 ## Quickstart
 
@@ -38,7 +41,7 @@ bun install              # also installs the git hooks
 bun run dev              # http://localhost:5173
 ```
 
-The first load seeds the bundled pool (30,071 phonemized entries) into IndexedDB and builds the scripts; a redeployed pool reseeds itself. Create a speaker (name, optional gender, age range, dialect, microphone, and the consent checkbox), allow the microphone, press Space.
+The first load seeds the bundled pool (30,071 phonemized entries) into IndexedDB and builds the scripts; a redeployed pool reseeds itself. Create a dataset (name, speaker name, target hours, optional gender, age range, dialect, microphone, and the consent checkbox), allow the microphone, press Space.
 
 Verify a change:
 
@@ -48,6 +51,8 @@ bun run smoke            # Playwright drives Chrome through record, review, expo
 ```
 
 ## Export layout
+
+Each export covers one dataset, so one speaker. Two datasets exported into the same folder overwrite each other's `speakers.jsonl` and `manifest.json`; use one folder per dataset or merge the JSONL files yourself.
 
 ```
 dataset/
@@ -89,9 +94,9 @@ The build drops fragments under four words and lines that indo-g2p reads mostly 
 ```
 audionesia-dataset-gen/
 ├── src/
-│   ├── app.tsx  main.tsx        # shell: header, speaker picker, tabs, help dialogs
+│   ├── app.tsx  main.tsx        # shell: header, home page or workspace tabs, help dialogs
 │   ├── components/              # Kumo-styled Solid components, one per file
-│   ├── features/                # record, review, write, dataset, settings, speakers, library
+│   ├── features/                # workspaces, record, review, clips, write, dataset, settings, library
 │   ├── lib/                     # audio, asr, backup, corpus, db, export, g2p, text: pure logic and repositories
 │   └── workers/                 # G2P worker, script-builder worker, ASR worker, recorder worklet
 ├── public/corpus/               # generated pool (committed)
