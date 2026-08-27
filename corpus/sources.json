@@ -1,0 +1,20 @@
+[
+  {
+    "name": "VOA Indonesia",
+    "license": "Public domain (Voice of America original reporting, US government work). Wire-service material republished by VOA stays with its owner.",
+    "maxArticles": 60,
+    "feeds": [
+      "https://www.voaindonesia.com/api/zmgqol-vomx-tpeympp",
+      "https://www.voaindonesia.com/api/zmgo_l-vomx-tpeymmy",
+      "https://www.voaindonesia.com/api/z-jqtl-vomx-tperypq",
+      "https://www.voaindonesia.com/api/ztgq_l-vomx-tpekmpv",
+      "https://www.voaindonesia.com/api/zkjq_l-vomx-tpej_pv",
+      "https://www.voaindonesia.com/api/zpioml-vomx-tpe_gpy",
+      "https://www.voaindonesia.com/api/zr-qol-vomx-tpeoypi",
+      "https://www.voaindonesia.com/api/zugqyl-vomx-tpegmpt",
+      "https://www.voaindonesia.com/api/zvjqil-vomx-tpeu_pm",
+      "https://www.voaindonesia.com/api/zujqml-vomx-tpeg_py"
+    ],
+    "urls": []
+  }
+]
