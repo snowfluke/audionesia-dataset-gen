@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/snowfluke/audionesia-dataset-gen/actions/workflows/ci.yml/badge.svg)](https://github.com/snowfluke/audionesia-dataset-gen/actions/workflows/ci.yml) [![Live app](https://img.shields.io/badge/app-GitHub%20Pages-2a78d6)](https://snowfluke.github.io/audionesia-dataset-gen/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
-Build an Indonesian text-to-speech training dataset in the browser. Audionesia ships a phoneme-balanced reading corpus, records raw PCM from the microphone, keeps everything in IndexedDB, and exports the `dataset/` layout that StyleTTS2 and PocketTTS training expect. No server, no account: open the page and record.
+Build an Indonesian text-to-speech training dataset in the browser. Audionesia Dataset Generator ships a phoneme-balanced reading corpus, records raw PCM from the microphone, keeps everything in IndexedDB, and exports the `dataset/` layout that StyleTTS2 and PocketTTS training expect. No server, no account: open the page and record.
 
 ```text
 {"hash":"61455d3da0556e62","path":"dataset/audio/budi/clip_0001.wav","text":"Tak seorang pun boleh ditangkap.","phonemes":"taʔ səoraŋ pun boleh ditaŋkap.","duration":3.727,"speaker":"budi"}
