@@ -1,7 +1,8 @@
-// Browser smoke test against the dev server: seeds the corpus, creates a speaker,
-// records with Chrome's fake microphone, reviews, exports a ZIP, and reloads.
+// Browser smoke test against the dev server: seeds the corpus, creates a
+// dataset workspace, records with Chrome's fake microphone, reviews, lists
+// clips, exports a ZIP, backs up, and reloads.
 // Usage: bun run dev (in another terminal), then bun run smoke. Needs Google Chrome.
-// Screenshots and the ZIP land in .smoke/.
+// Screenshots and the ZIPs land in .smoke/.
 import { chromium } from "playwright";
 
 const APP_URL = "http://localhost:5173/";
@@ -34,8 +35,8 @@ async function shot(name: string): Promise<void> {
 await Bun.write(`${OUT}.keep`, "");
 console.log("nav");
 await page.goto(APP_URL);
-await page.getByText("Audionesia").first().waitFor({ timeout: 30_000 });
-await shot("01-loaded");
+await page.getByText("Audionesia Dataset Generator").first().waitFor({ timeout: 30_000 });
+await shot("01-home");
 
 console.log("waiting for seeding + script build");
 await page.waitForFunction(
@@ -45,12 +46,13 @@ await page.waitForFunction(
 );
 await shot("02-ready");
 
-console.log("create speaker");
-await page.getByRole("button", { name: "+ Pembicara baru" }).click();
+console.log("create workspace");
+await page.getByRole("button", { name: "+ Dataset baru" }).click();
+await page.getByPlaceholder("Suara Budi").fill("Suara Budi");
 await page.getByPlaceholder("Budi Santoso").fill("Budi");
 await page.locator("dialog[open] input[type=checkbox]").check();
 await page.locator("dialog[open] button[type=submit]").click();
-await page.locator("select[aria-label=Pembicara]").waitFor({ timeout: 10_000 });
+await page.getByRole("navigation", { name: "Lokasi" }).waitFor({ timeout: 10_000 });
 await page.locator("p.text-2xl").first().waitFor({ timeout: 60_000 });
 const scriptText = await page.locator("p.text-2xl").first().innerText();
 console.log("script:", scriptText.slice(0, 120));
@@ -83,14 +85,22 @@ await page.getByRole("button", { name: "Ya", exact: true }).click();
 await page.getByText("Klip disetujui").waitFor({ timeout: 10_000 });
 await page.getByRole("tab", { name: "Disetujui" }).click();
 await page.getByRole("button", { name: "Rekam ulang naskah" }).waitFor({ timeout: 15_000 });
-await page.getByRole("tab", { name: "Menunggu" }).click();
 await shot("06-reviewed");
+
+console.log("clip list");
+await page.getByRole("tab", { name: "Klip" }).click();
+await page.getByRole("cell", { name: "clip_0001.wav" }).waitFor({ timeout: 15_000 });
+await shot("07-clips");
 
 console.log("dataset + export zip");
 await page.getByRole("tab", { name: "Dataset" }).click();
 await page.getByText("Ekspor dataset").waitFor({ timeout: 15_000 });
-await page.getByRole("cell", { name: "Budi" }).waitFor({ timeout: 15_000 });
-await shot("07-dataset");
+await page.getByLabel("Struktur folder ekspor").waitFor({ timeout: 15_000 });
+const tree = await page.getByLabel("Struktur folder ekspor").innerText();
+if (!tree.includes("speakers.jsonl") || !tree.includes("budi/")) {
+  errors.push(`[smoke] export tree missing entries:\n${tree}`);
+}
+await shot("08-dataset");
 const [download] = await Promise.all([
   page.waitForEvent("download", { timeout: 60_000 }),
   page.getByRole("button", { name: "Unduh ZIP" }).click(),
@@ -99,27 +109,32 @@ const zipPath = `${OUT}dataset.zip`;
 await download.saveAs(zipPath);
 console.log("zip saved:", zipPath);
 await page.getByText("klip diekspor").waitFor({ timeout: 15_000 });
-await shot("08-exported");
+await shot("09-exported");
 
-console.log("backup zip");
+console.log("own text tab + sample file");
+await page.getByRole("tab", { name: "Teks sendiri" }).click();
+await page.getByRole("link", { name: "contoh-kalimat.txt" }).waitFor({ timeout: 10_000 });
+await shot("10-write");
+
+console.log("home + backup zip");
+await page.getByRole("button", { name: "← Semua dataset" }).click();
+await page.getByRole("button", { name: "Buka" }).waitFor({ timeout: 15_000 });
 const [backup] = await Promise.all([
   page.waitForEvent("download", { timeout: 60_000 }),
   page.getByRole("button", { name: "Cadangkan sebagai ZIP" }).click(),
 ]);
 await backup.saveAs(`${OUT}backup.zip`);
 await page.getByText("klip dicadangkan").waitFor({ timeout: 15_000 });
+await shot("11-home-with-dataset");
 
-console.log("settings tab");
-await page.getByRole("tab", { name: "Pengaturan" }).click();
-await page.getByText("Jendela durasi").waitFor({ timeout: 10_000 });
-await shot("09-settings");
-
-console.log("reload persistence");
+console.log("reopen + reload persistence");
+await page.getByRole("button", { name: "Buka" }).click();
+await page.getByRole("navigation", { name: "Lokasi" }).waitFor({ timeout: 10_000 });
 await page.reload();
-await page.locator("select[aria-label=Pembicara]").waitFor({ timeout: 60_000 });
-await page.getByRole("tab", { name: "Dataset" }).click();
-await page.getByRole("cell", { name: "Budi" }).waitFor({ timeout: 15_000 });
-await shot("10-after-reload");
+await page.getByRole("navigation", { name: "Lokasi" }).waitFor({ timeout: 60_000 });
+await page.getByRole("tab", { name: "Klip" }).click();
+await page.getByRole("cell", { name: "clip_0001.wav" }).waitFor({ timeout: 15_000 });
+await shot("12-after-reload");
 
 await browser.close();
 console.log(`console errors/warnings: ${errors.length}`);
