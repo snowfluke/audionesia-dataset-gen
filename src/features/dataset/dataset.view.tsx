@@ -1,35 +1,71 @@
 import type { JSX } from "@solidjs/web";
-import { For, Loading, Show } from "solid-js";
+import { Loading, Show } from "solid-js";
 
 import Button from "../../components/button.tsx";
+import Input from "../../components/input.tsx";
 import LayerCard from "../../components/layer-card.tsx";
 import Meter from "../../components/meter.tsx";
-import { Cell, Head, Row, Table } from "../../components/table.tsx";
 import { attempt } from "../../components/toast.tsx";
 import { formatBytes, formatCount, formatDuration } from "../../lib/format.ts";
-import { settings } from "../settings/settings.store.ts";
-import ExportPanel from "./export-panel.tsx";
+import { updateWorkspace } from "../workspaces/workspaces.store.ts";
 import type { CoverageCount } from "./dataset.store.ts";
 import { createDatasetStore } from "./dataset.store.ts";
+import ExportPanel from "./export-panel.tsx";
+
+const SECONDS_PER_HOUR = 3600;
 
 function coverageDetail(count: CoverageCount): string {
   return `${formatCount(count.covered)} / ${formatCount(count.total)}`;
 }
 
+function Stat(props: { label: string; value: string }): JSX.Element {
+  return (
+    <div class="flex flex-col gap-0.5 rounded-lg bg-kumo-tint px-3 py-2">
+      <span class="text-xs text-kumo-subtle">{props.label}</span>
+      <span class="text-lg font-semibold text-kumo-strong tabular-nums">{props.value}</span>
+    </div>
+  );
+}
+
 export default function DatasetView(): JSX.Element {
   const store = createDatasetStore();
-  const targetSeconds = (): number => settings().targetHours * 3600;
+  const targetHours = (): number => store.workspace()?.targetHours ?? 0;
+  const targetSeconds = (): number => targetHours() * SECONDS_PER_HOUR;
   return (
     <div class="flex flex-col gap-4">
       <Loading fallback={<p class="text-kumo-subtle">Menghitung statistik...</p>}>
         <LayerCard class="flex flex-col gap-3">
-          <h2 class="text-lg font-semibold text-kumo-strong">Kemajuan</h2>
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <h2 class="text-lg font-semibold text-kumo-strong">Kemajuan</h2>
+            <label class="flex items-center gap-2 text-xs whitespace-nowrap text-kumo-subtle">
+              Target (jam)
+              <Input
+                type="number"
+                size="sm"
+                class="w-24"
+                min={0.5}
+                step={0.5}
+                value={targetHours()}
+                onChange={(event) => {
+                  const value = Number(event.currentTarget.value);
+                  if (Number.isFinite(value) && value > 0)
+                    void attempt(() => updateWorkspace({ targetHours: value }));
+                }}
+              />
+            </label>
+          </div>
           <Meter
-            value={store.stats().totalApprovedSeconds}
+            value={store.stats().approvedSeconds}
             max={targetSeconds()}
-            label={`Durasi disetujui, semua pembicara (target ${settings().targetHours} jam)`}
-            detail={`${formatDuration(store.stats().totalApprovedSeconds)} / ${formatDuration(targetSeconds())}`}
+            label="Durasi disetujui"
+            detail={`${formatDuration(store.stats().approvedSeconds)} / ${targetHours()} jam`}
           />
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Stat label="Menunggu" value={formatCount(store.stats().pending)} />
+            <Stat label="Disetujui" value={formatCount(store.stats().approved)} />
+            <Stat label="Ditolak" value={formatCount(store.stats().rejected)} />
+            <Stat label="Durasi disetujui" value={formatDuration(store.stats().approvedSeconds)} />
+          </div>
           <Meter
             value={store.stats().coverage.phones.covered}
             max={store.stats().coverage.phones.total}
@@ -48,51 +84,6 @@ export default function DatasetView(): JSX.Element {
             label="Fenomena ejaan dan prosodi tercakup"
             detail={coverageDetail(store.stats().coverage.phenomena)}
           />
-        </LayerCard>
-
-        <LayerCard class="flex flex-col gap-3">
-          <h2 class="text-lg font-semibold text-kumo-strong">Pembicara</h2>
-          <Table>
-            <thead>
-              <tr>
-                <Head>Pembicara</Head>
-                <Head class="text-right">Menunggu</Head>
-                <Head class="text-right">Disetujui</Head>
-                <Head class="text-right">Ditolak</Head>
-                <Head class="text-right">Durasi disetujui</Head>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={store.stats().speakers}>
-                {(row) => (
-                  <Row>
-                    <Cell>{row.speaker.name}</Cell>
-                    <Cell class="text-right tabular-nums">{formatCount(row.pending)}</Cell>
-                    <Cell class="text-right tabular-nums">{formatCount(row.approved)}</Cell>
-                    <Cell class="text-right tabular-nums">{formatCount(row.rejected)}</Cell>
-                    <Cell class="text-right tabular-nums">
-                      {formatDuration(row.approvedSeconds)}
-                    </Cell>
-                  </Row>
-                )}
-              </For>
-              <Row class="font-medium">
-                <Cell>Total</Cell>
-                <Cell class="text-right tabular-nums">
-                  {formatCount(store.stats().speakers.reduce((sum, row) => sum + row.pending, 0))}
-                </Cell>
-                <Cell class="text-right tabular-nums">
-                  {formatCount(store.stats().speakers.reduce((sum, row) => sum + row.approved, 0))}
-                </Cell>
-                <Cell class="text-right tabular-nums">
-                  {formatCount(store.stats().speakers.reduce((sum, row) => sum + row.rejected, 0))}
-                </Cell>
-                <Cell class="text-right tabular-nums">
-                  {formatDuration(store.stats().totalApprovedSeconds)}
-                </Cell>
-              </Row>
-            </tbody>
-          </Table>
           <div class="flex flex-wrap items-center gap-3 text-xs text-kumo-subtle">
             <Show when={store.stats().storage}>
               {(storage) => (

@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 import { poolSentenceSchema } from "../corpus/schema.ts";
-import type { Clip, SkipRow, Speaker } from "../db/schema.ts";
+import type { Clip, SkipRow, Speaker, Workspace } from "../db/schema.ts";
 import { AGE_RANGES, CLIP_STATUSES, SPEAKER_GENDERS } from "../db/schema.ts";
 
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
 
 export const backupManifestSchema = z.object({
   version: z.literal(BACKUP_VERSION),
@@ -21,12 +21,20 @@ export const speakerSchema = z.object({
   microphone: z.string().optional(),
   consentAt: z.string().optional(),
   notes: z.string().optional(),
+});
+
+export const workspaceSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  speaker: speakerSchema,
+  targetHours: z.number().positive(),
   nextSeq: z.number().int().positive(),
   createdAt: z.string(),
 });
 
 export const clipSchema = z.object({
   id: z.string().min(1),
+  workspaceId: z.string().min(1),
   speakerId: z.string().min(1),
   scriptId: z.string().min(1),
   seq: z.number().int().positive(),
@@ -46,24 +54,19 @@ export const clipSchema = z.object({
 });
 
 export const skipSchema = z.object({
-  speakerId: z.string().min(1),
+  workspaceId: z.string().min(1),
   scriptId: z.string().min(1),
   skippedAt: z.string(),
 });
 
-export const speakersFileSchema = z.array(speakerSchema);
+export const workspacesFileSchema = z.array(workspaceSchema);
 export const clipsFileSchema = z.array(clipSchema);
 export const skipsFileSchema = z.array(skipSchema);
 export const sentencesFileSchema = z.array(poolSentenceSchema);
 
 /** Builds a `Speaker` without the undefined keys Zod's optional fields carry. */
-export function toSpeaker(parsed: z.infer<typeof speakerSchema>): Speaker {
-  const speaker: Speaker = {
-    id: parsed.id,
-    name: parsed.name,
-    nextSeq: parsed.nextSeq,
-    createdAt: parsed.createdAt,
-  };
+function toSpeaker(parsed: z.infer<typeof speakerSchema>): Speaker {
+  const speaker: Speaker = { id: parsed.id, name: parsed.name };
   if (parsed.gender !== undefined) speaker.gender = parsed.gender;
   if (parsed.ageRange !== undefined) speaker.ageRange = parsed.ageRange;
   if (parsed.dialect !== undefined) speaker.dialect = parsed.dialect;
@@ -73,9 +76,21 @@ export function toSpeaker(parsed: z.infer<typeof speakerSchema>): Speaker {
   return speaker;
 }
 
+export function toWorkspace(parsed: z.infer<typeof workspaceSchema>): Workspace {
+  return {
+    id: parsed.id,
+    name: parsed.name,
+    speaker: toSpeaker(parsed.speaker),
+    targetHours: parsed.targetHours,
+    nextSeq: parsed.nextSeq,
+    createdAt: parsed.createdAt,
+  };
+}
+
 export function toClip(parsed: z.infer<typeof clipSchema>): Clip {
   const clip: Clip = {
     id: parsed.id,
+    workspaceId: parsed.workspaceId,
     speakerId: parsed.speakerId,
     scriptId: parsed.scriptId,
     seq: parsed.seq,
@@ -97,5 +112,9 @@ export function toClip(parsed: z.infer<typeof clipSchema>): Clip {
 }
 
 export function toSkip(parsed: z.infer<typeof skipSchema>): SkipRow {
-  return { speakerId: parsed.speakerId, scriptId: parsed.scriptId, skippedAt: parsed.skippedAt };
+  return {
+    workspaceId: parsed.workspaceId,
+    scriptId: parsed.scriptId,
+    skippedAt: parsed.skippedAt,
+  };
 }

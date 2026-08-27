@@ -4,17 +4,17 @@ import type { z } from "zod";
 import { getClip, putClipWithAudio } from "../db/clip.repository.ts";
 import { existingSentenceIds, putSentences } from "../db/sentence.repository.ts";
 import { putSkips } from "../db/skip.repository.ts";
-import { getSpeaker, putSpeaker } from "../db/speaker.repository.ts";
+import { getWorkspace, putWorkspace } from "../db/workspace.repository.ts";
 import { BACKUP_ROOT } from "./backup.ts";
 import {
   backupManifestSchema,
   clipsFileSchema,
   sentencesFileSchema,
   skipsFileSchema,
-  speakersFileSchema,
   toClip,
   toSkip,
-  toSpeaker,
+  toWorkspace,
+  workspacesFileSchema,
 } from "./schema.ts";
 
 /** Reads backup files by path relative to the backup root. */
@@ -70,7 +70,7 @@ export async function zipSource(file: File): Promise<BackupSource> {
 }
 
 export type RestoreReport = {
-  speakers: number;
+  workspaces: number;
   clips: number;
   skippedClips: number;
   sentences: number;
@@ -84,26 +84,28 @@ async function readJson<T>(source: BackupSource, path: string, schema: z.ZodType
 
 /**
  * Merges a backup into the current database. Existing clips are left alone;
- * speakers keep the higher sequence counter so new clips never reuse a name.
+ * workspaces keep the higher sequence counter so new clips never reuse a name.
  */
 export async function restoreBackup(
   source: BackupSource,
   onProgress: (done: number, total: number) => void
 ): Promise<RestoreReport> {
   await readJson(source, "manifest.json", backupManifestSchema);
-  const speakers = (await readJson(source, "speakers.json", speakersFileSchema)).map(toSpeaker);
+  const workspaces = (await readJson(source, "workspaces.json", workspacesFileSchema)).map(
+    toWorkspace
+  );
   const clips = (await readJson(source, "clips.json", clipsFileSchema)).map(toClip);
   const skips = (await readJson(source, "skips.json", skipsFileSchema)).map(toSkip);
   const sentencesText = await source.readText("user-sentences.json");
   const sentences =
     sentencesText === null ? [] : sentencesFileSchema.parse(JSON.parse(sentencesText));
 
-  for (const speaker of speakers) {
-    const existing = await getSpeaker(speaker.id);
-    await putSpeaker(
+  for (const workspace of workspaces) {
+    const existing = await getWorkspace(workspace.id);
+    await putWorkspace(
       existing === undefined
-        ? speaker
-        : { ...existing, nextSeq: Math.max(existing.nextSeq, speaker.nextSeq) }
+        ? workspace
+        : { ...existing, nextSeq: Math.max(existing.nextSeq, workspace.nextSeq) }
     );
   }
   let restored = 0;
@@ -125,5 +127,5 @@ export async function restoreBackup(
   const existing = await existingSentenceIds(sentences.map((row) => row.id));
   const fresh = sentences.filter((row) => !existing.has(row.id));
   await putSentences(fresh);
-  return { speakers: speakers.length, clips: restored, skippedClips, sentences: fresh.length };
+  return { workspaces: workspaces.length, clips: restored, skippedClips, sentences: fresh.length };
 }

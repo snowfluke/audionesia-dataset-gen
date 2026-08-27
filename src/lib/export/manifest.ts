@@ -21,6 +21,9 @@ export type ExportRow = {
   split: Split;
 };
 
+export const EXPORT_FORMATS = ["hf", "styletts2", "pocket-tts"] as const;
+export type ExportFormat = (typeof EXPORT_FORMATS)[number];
+
 export const DATASET_ROOT = "dataset";
 /** One clip in this many goes to validation. */
 export const VALIDATION_EVERY = 20;

@@ -2,7 +2,7 @@ import { getClipAudio, listClips } from "../db/clip.repository.ts";
 import { listSentencesBySource } from "../db/sentence.repository.ts";
 import { loadSettings } from "../db/settings.repository.ts";
 import { listSkips } from "../db/skip.repository.ts";
-import { listSpeakers } from "../db/speaker.repository.ts";
+import { listWorkspaces } from "../db/workspace.repository.ts";
 import type { DatasetWriter } from "../export/writer.ts";
 import { BACKUP_VERSION } from "./schema.ts";
 
@@ -15,7 +15,7 @@ function json<T>(value: T): string {
 }
 
 /**
- * Writes everything that cannot be regenerated: speakers, clips with their
+ * Writes everything that cannot be regenerated: workspaces, clips with their
  * master WAVs, skips, settings, and sentences added in Tulis. The bundled pool
  * and the scripts are rebuilt from the site, so they are not included.
  */
@@ -23,14 +23,14 @@ export async function exportBackup(
   writer: DatasetWriter,
   onProgress: (done: number, total: number) => void
 ): Promise<BackupReport> {
-  const [speakers, clips, skips, settings, sentences] = await Promise.all([
-    listSpeakers(),
+  const [workspaces, clips, skips, settings, sentences] = await Promise.all([
+    listWorkspaces(),
     listClips(),
     listSkips(),
     loadSettings(),
     listSentencesBySource("user"),
   ]);
-  await writer.file(`${BACKUP_ROOT}/speakers.json`, json(speakers));
+  await writer.file(`${BACKUP_ROOT}/workspaces.json`, json(workspaces));
   await writer.file(`${BACKUP_ROOT}/clips.json`, json(clips));
   await writer.file(`${BACKUP_ROOT}/skips.json`, json(skips));
   await writer.file(`${BACKUP_ROOT}/settings.json`, json(settings));

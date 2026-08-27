@@ -2,40 +2,30 @@ import { createMemo, createSignal } from "solid-js";
 
 import { showToast } from "../../components/toast.tsx";
 import { checkClipWithAsr } from "../../lib/asr/check.ts";
-import { exportBackup } from "../../lib/backup/backup.ts";
-import { folderSource, restoreBackup, zipSource } from "../../lib/backup/restore.ts";
-import { deleteRejectedAudio, listClipsByStatus } from "../../lib/db/clip.repository.ts";
+import {
+  deleteRejectedAudio,
+  listClipsByWorkspace,
+  listClipsByWorkspaceStatus,
+} from "../../lib/db/clip.repository.ts";
 import type { StorageUsage } from "../../lib/db/database.ts";
 import { storageUsage } from "../../lib/db/database.ts";
-import type { Clip, ScriptRow, Speaker } from "../../lib/db/schema.ts";
+import type { Clip, ScriptRow, Workspace } from "../../lib/db/schema.ts";
 import { getScript } from "../../lib/db/script.repository.ts";
 import { getSentences } from "../../lib/db/sentence.repository.ts";
-import { listSpeakers } from "../../lib/db/speaker.repository.ts";
 import { listUnitLabels } from "../../lib/db/unit.repository.ts";
 import type { ExportFormat } from "../../lib/export/export.ts";
 import { EXPORT_FORMATS, exportDataset } from "../../lib/export/export.ts";
-import type { DatasetWriter } from "../../lib/export/writer.ts";
-import {
-  canPickDirectory,
-  createFolderWriter,
-  createZipWriter,
-  pickDirectory,
-} from "../../lib/export/writer.ts";
+import type { ExportTarget } from "../../lib/export/writer.ts";
+import { canPickDirectory, writerFor } from "../../lib/export/writer.ts";
 import { formatBytes, formatCount } from "../../lib/format.ts";
 import { bumpClips, clipsVersion } from "../library/library.store.ts";
 import { settings } from "../settings/settings.store.ts";
-import { speakersVersion } from "../speakers/speakers.store.ts";
+import { currentWorkspace, workspacesVersion } from "../workspaces/workspaces.store.ts";
+import type { Progress } from "./progress.ts";
+import { createProgressRunner } from "./progress.ts";
 
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "0.2.0";
 const BYTES_PER_SAMPLE = 2;
-
-export type SpeakerStats = {
-  speaker: Speaker;
-  pending: number;
-  approved: number;
-  rejected: number;
-  approvedSeconds: number;
-};
 
 /** Units covered by approved clips versus units present in the pool. */
 export type CoverageCount = { covered: number; total: number };
@@ -47,45 +37,29 @@ export type CoverageStats = {
 };
 
 export type DatasetStats = {
-  speakers: SpeakerStats[];
-  totalApprovedSeconds: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  approvedSeconds: number;
   /** Estimated bytes held by rejected clips' master audio. */
   rejectedAudioBytes: number;
   coverage: CoverageStats;
   storage: StorageUsage | null;
 };
 
-export type ExportTarget = "folder" | "zip";
-export type Progress = { label: string; done: number; total: number };
-
 export type DatasetStore = {
+  workspace: () => Workspace | null;
   stats: () => DatasetStats;
   formats: () => Set<ExportFormat>;
   toggleFormat: (format: ExportFormat) => void;
   progress: () => Progress | null;
   warnings: () => string[];
   exportTo: (target: ExportTarget) => Promise<void>;
-  backupTo: (target: ExportTarget) => Promise<void>;
-  restoreFromFolder: () => Promise<void>;
-  restoreFromZip: (file: File) => Promise<void>;
   freeRejectedAudio: () => Promise<void>;
   /** Transcribes every pending clip and flags the ones that differ from their script. */
   checkPendingWithAsr: () => Promise<void>;
   canPickDirectory: () => boolean;
 };
-
-function statsFor(speaker: Speaker, clips: readonly Clip[]): SpeakerStats {
-  const own = clips.filter((clip) => clip.speakerId === speaker.id);
-  return {
-    speaker,
-    pending: own.filter((clip) => clip.status === "pending").length,
-    approved: own.filter((clip) => clip.status === "approved").length,
-    rejected: own.filter((clip) => clip.status === "rejected").length,
-    approvedSeconds: own
-      .filter((clip) => clip.status === "approved")
-      .reduce((sum, clip) => sum + clip.durationSec, 0),
-  };
-}
 
 function countPrefix(
   labels: readonly string[],
@@ -122,27 +96,28 @@ async function coverageFor(
   };
 }
 
-/** Call inside the Dataset view. */
+/** Call inside the Dataset view. Everything here is scoped to the open workspace. */
 export function createDatasetStore(): DatasetStore {
   const [formats, setFormats] = createSignal<Set<ExportFormat>>(new Set(EXPORT_FORMATS));
-  const [progress, setProgress] = createSignal<Progress | null>(null);
   const [warnings, setWarnings] = createSignal<string[]>([]);
+  const runner = createProgressRunner();
 
   const stats = createMemo(async (): Promise<DatasetStats> => {
     clipsVersion();
-    speakersVersion();
-    const [speakers, pending, approved, rejected, labels, storage] = await Promise.all([
-      listSpeakers(),
-      listClipsByStatus("pending"),
-      listClipsByStatus("approved"),
-      listClipsByStatus("rejected"),
+    workspacesVersion();
+    const workspace = currentWorkspace();
+    const [clips, labels, storage] = await Promise.all([
+      workspace === null ? [] : listClipsByWorkspace(workspace.id),
       listUnitLabels(),
       storageUsage(),
     ]);
-    const clips = [...pending, ...approved, ...rejected];
+    const approved = clips.filter((clip) => clip.status === "approved");
+    const rejected = clips.filter((clip) => clip.status === "rejected");
     return {
-      speakers: speakers.map((speaker) => statsFor(speaker, clips)),
-      totalApprovedSeconds: approved.reduce((sum, clip) => sum + clip.durationSec, 0),
+      pending: clips.filter((clip) => clip.status === "pending").length,
+      approved: approved.length,
+      rejected: rejected.length,
+      approvedSeconds: approved.reduce((sum, clip) => sum + clip.durationSec, 0),
       rejectedAudioBytes: rejected.reduce(
         (sum, clip) => sum + clip.durationSec * clip.sampleRate * BYTES_PER_SAMPLE,
         0
@@ -161,32 +136,21 @@ export function createDatasetStore(): DatasetStore {
     });
   }
 
-  async function writerFor(target: ExportTarget, stem: string): Promise<DatasetWriter> {
-    if (target === "folder" && canPickDirectory()) return createFolderWriter();
-    return createZipWriter(`${stem}-${new Date().toISOString().slice(0, 10)}.zip`);
-  }
-
-  async function run(
-    label: string,
-    task: (report: (done: number, total: number) => void) => Promise<void>
-  ): Promise<void> {
-    if (progress() !== null) return;
-    setProgress({ label, done: 0, total: 0 });
-    try {
-      await task((done, total) => setProgress({ label, done, total }));
-    } finally {
-      setProgress(null);
-    }
-  }
-
   async function exportTo(target: ExportTarget): Promise<void> {
-    const writer = await writerFor(target, "audionesia-dataset");
+    const workspace = currentWorkspace();
+    if (workspace === null) return;
+    const writer = await writerFor(
+      target,
+      `audionesia-${workspace.id}`,
+      `dataset/audio/${workspace.speaker.id}`
+    );
     const current = settings();
     const chosenFormats = formats();
-    await run("Mengekspor", async (report) => {
+    await runner.run("Mengekspor", async (report) => {
       setWarnings([]);
       const result = await exportDataset({
         writer,
+        workspaceId: workspace.id,
         formats: chosenFormats,
         sampleRate: current.exportSampleRate,
         normalizePeakDbfs: current.normalizePeakDbfs,
@@ -200,55 +164,28 @@ export function createDatasetStore(): DatasetStore {
     });
   }
 
-  async function backupTo(target: ExportTarget): Promise<void> {
-    const writer = await writerFor(target, "audionesia-backup");
-    await run("Mencadangkan", async (report) => {
-      const result = await exportBackup(writer, report);
-      showToast(`${formatCount(result.clips)} klip dicadangkan`, "success");
-    });
-  }
-
-  async function restoreFromFolder(): Promise<void> {
-    const root = await pickDirectory("read");
-    await run("Memulihkan", async (report) => {
-      const result = await restoreBackup(folderSource(root), report);
-      bumpClips();
-      showToast(
-        `${formatCount(result.clips)} klip dipulihkan, ${formatCount(result.skippedClips)} sudah ada`,
-        "success"
-      );
-    });
-  }
-
-  async function restoreFromZip(file: File): Promise<void> {
-    await run("Memulihkan", async (report) => {
-      const result = await restoreBackup(await zipSource(file), report);
-      bumpClips();
-      showToast(
-        `${formatCount(result.clips)} klip dipulihkan, ${formatCount(result.skippedClips)} sudah ada`,
-        "success"
-      );
-    });
-  }
-
   async function freeRejectedAudio(): Promise<void> {
-    const bytes = await deleteRejectedAudio();
+    const workspace = currentWorkspace();
+    if (workspace === null) return;
+    const bytes = await deleteRejectedAudio(workspace.id);
     bumpClips();
     showToast(`${formatBytes(bytes)} dibebaskan`, "success");
   }
 
   async function checkPendingWithAsr(): Promise<void> {
+    const workspace = currentWorkspace();
+    if (workspace === null) return;
     const current = settings();
-    const pending = await listClipsByStatus("pending");
+    const pending = await listClipsByWorkspaceStatus(workspace.id, "pending");
     if (pending.length === 0) {
       showToast("Tidak ada klip yang menunggu tinjauan");
       return;
     }
-    await run("Memeriksa dengan ASR", async (report) => {
+    await runner.run("Memeriksa dengan ASR", async (report) => {
       let flagged = 0;
       for (const [done, clip] of pending.entries()) {
         const result = await checkClipWithAsr(clip, current.asrModel, (file, percent) =>
-          setProgress({
+          runner.setProgress({
             label: `Mengunduh ${file} ${percent.toFixed(0)}%`,
             done: 0,
             total: pending.length,
@@ -266,15 +203,13 @@ export function createDatasetStore(): DatasetStore {
   }
 
   return {
+    workspace: currentWorkspace,
     stats,
     formats,
     toggleFormat,
-    progress,
+    progress: runner.progress,
     warnings,
     exportTo,
-    backupTo,
-    restoreFromFolder,
-    restoreFromZip,
     freeRejectedAudio,
     checkPendingWithAsr,
     canPickDirectory,

@@ -7,7 +7,7 @@ import LayerCard from "../../components/layer-card.tsx";
 import Select from "../../components/select.tsx";
 import Switch from "../../components/switch.tsx";
 import { attempt, showToast } from "../../components/toast.tsx";
-import { listClipsBySpeakerStatus } from "../../lib/db/clip.repository.ts";
+import { listClipsByWorkspaceStatus } from "../../lib/db/clip.repository.ts";
 import { getScript } from "../../lib/db/script.repository.ts";
 import type { DurationSample } from "../../lib/duration.ts";
 import { MIN_CALIBRATION_CLIPS, fitSyllablesPerSecond } from "../../lib/duration.ts";
@@ -15,7 +15,7 @@ import { ASR_MODELS } from "../../lib/asr/messages.ts";
 import type { AppSettings, TrainerPreset } from "../../lib/settings.ts";
 import { EXPORT_SAMPLE_RATES, TRAINER_PRESETS, TRAINER_PRESET_IDS } from "../../lib/settings.ts";
 import { rebuildScripts } from "../library/library.store.ts";
-import { currentSpeakerId } from "../speakers/speakers.store.ts";
+import { currentWorkspace } from "../workspaces/workspaces.store.ts";
 import { settings, updateSettings } from "./settings.store.ts";
 
 type NumberKey = {
@@ -34,7 +34,7 @@ const WINDOW_FIELDS: readonly NumberField[] = [
   },
   { key: "targetMinSec", label: "Durasi target minimum (detik)", step: 1, min: 1 },
   { key: "targetMaxSec", label: "Durasi target maksimum (detik)", step: 1, min: 2 },
-  { key: "targetHours", label: "Target total rekaman (jam)", step: 1, min: 1 },
+  { key: "targetHours", label: "Target rekaman bawaan untuk dataset baru (jam)", step: 1, min: 1 },
   { key: "batchSize", label: "Klip per batch", step: 1, min: 1, max: 20 },
 ];
 
@@ -101,9 +101,9 @@ export default function SettingsView(): JSX.Element {
   const [fitted, setFitted] = createSignal<number | null>(null);
 
   async function calibrate(): Promise<void> {
-    const speakerId = currentSpeakerId();
-    if (speakerId === null) throw new Error("Pilih pembicara dulu");
-    const clips = await listClipsBySpeakerStatus(speakerId, "approved");
+    const workspace = currentWorkspace();
+    if (workspace === null) throw new Error("Buka dataset dulu");
+    const clips = await listClipsByWorkspaceStatus(workspace.id, "approved");
     if (clips.length < MIN_CALIBRATION_CLIPS) {
       throw new Error(
         `Perlu minimal ${MIN_CALIBRATION_CLIPS} klip yang disetujui; baru ${clips.length}`
@@ -158,7 +158,7 @@ export default function SettingsView(): JSX.Element {
       <LayerCard class="flex flex-col gap-3">
         <h2 class="text-lg font-semibold text-kumo-strong">Kalibrasi laju bicara</h2>
         <p class="text-base text-kumo-subtle">
-          Menghitung suku kata per detik dari klip pembicara saat ini yang sudah disetujui (minimal{" "}
+          Menghitung suku kata per detik dari klip dataset ini yang sudah disetujui (minimal{" "}
           {MIN_CALIBRATION_CLIPS} klip), lalu memakainya untuk perkiraan durasi naskah.
         </p>
         <div class="flex flex-wrap items-center gap-2">

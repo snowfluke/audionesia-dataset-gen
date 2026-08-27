@@ -32,34 +32,32 @@ export default function ExportPanel(props: ExportPanelProps): JSX.Element {
           selalu ditulis; format pelatih di bawah ini menambah berkasnya. Struktur folder yang
           dihasilkan mengikuti pilihan Anda.
         </p>
-        <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-          <div class="flex flex-col gap-2">
-            <For each={EXPORT_FORMATS}>
-              {(format) => (
-                <Switch
-                  checked={props.store.formats().has(format)}
-                  onChange={() => props.store.toggleFormat(format)}
-                  label={FORMAT_LABELS[format]}
-                />
-              )}
-            </For>
-            <Switch
-              checked={settings().licenseMode === "cc0"}
-              onChange={(checked) =>
-                void attempt(() => updateSettings({ licenseMode: checked ? "cc0" : "all" }))
-              }
-              label="Hanya klip dengan teks CC0 (Common Voice dan teks buatan), untuk dataset yang akan dipublikasikan"
-            />
-            <Switch
-              checked={settings().normalizePeakDbfs !== null}
-              onChange={(checked) =>
-                void attempt(() => updateSettings({ normalizePeakDbfs: checked ? -3 : null }))
-              }
-              label="Normalisasi puncak ke -3 dBFS (DC offset selalu dihilangkan)"
-            />
-          </div>
-          <ExportTree store={props.store} />
+        <div class="flex flex-col gap-2">
+          <For each={EXPORT_FORMATS}>
+            {(format) => (
+              <Switch
+                checked={props.store.formats().has(format)}
+                onChange={() => props.store.toggleFormat(format)}
+                label={FORMAT_LABELS[format]}
+              />
+            )}
+          </For>
+          <Switch
+            checked={settings().licenseMode === "cc0"}
+            onChange={(checked) =>
+              void attempt(() => updateSettings({ licenseMode: checked ? "cc0" : "all" }))
+            }
+            label="Hanya klip dengan teks CC0 (Common Voice dan teks buatan), untuk dataset yang akan dipublikasikan"
+          />
+          <Switch
+            checked={settings().normalizePeakDbfs !== null}
+            onChange={(checked) =>
+              void attempt(() => updateSettings({ normalizePeakDbfs: checked ? -3 : null }))
+            }
+            label="Normalisasi puncak ke -3 dBFS (DC offset selalu dihilangkan)"
+          />
         </div>
+        <ExportTree store={props.store} />
         <div class="flex flex-wrap gap-2">
           <Button
             variant="primary"

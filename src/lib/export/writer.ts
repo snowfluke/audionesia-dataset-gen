@@ -17,8 +17,6 @@ declare global {
   }
 }
 
-const AUDIO_DIR = "dataset/audio";
-
 export function canPickDirectory(): boolean {
   return window.showDirectoryPicker !== undefined;
 }
@@ -51,29 +49,28 @@ async function directoryAt(
   return directory;
 }
 
-/**
- * Removes WAV files under dataset/audio that this export did not write, so a
- * clip deleted or rejected since the last export does not linger on disk.
- */
-async function pruneAudio(
+/** Removes files directly under `dirPath` that this run did not write, so a deleted clip does not linger. */
+async function pruneUnwritten(
   root: FileSystemDirectoryHandle,
+  dirPath: string,
   written: ReadonlySet<string>
 ): Promise<void> {
-  const audio = await directoryAt(root, AUDIO_DIR.split("/"), false);
-  if (audio === null) return;
-  for await (const [speaker, handle] of audio.entries()) {
-    if (handle.kind !== "directory") continue;
-    let remaining = 0;
-    for await (const name of handle.keys()) {
-      if (written.has(`${AUDIO_DIR}/${speaker}/${name}`)) remaining += 1;
-      else await handle.removeEntry(name);
-    }
-    if (remaining === 0) await audio.removeEntry(speaker);
+  const directory = await directoryAt(root, dirPath.split("/"), false);
+  if (directory === null) return;
+  for await (const [name, handle] of directory.entries()) {
+    if (handle.kind !== "file") continue;
+    if (!written.has(`${dirPath}/${name}`)) await directory.removeEntry(name);
   }
 }
 
-/** Writes straight into a directory chosen with the File System Access API (Chromium). */
-export async function createFolderWriter(root?: FileSystemDirectoryHandle): Promise<DatasetWriter> {
+/**
+ * Writes straight into a directory chosen with the File System Access API
+ * (Chromium). Files under `pruneUnder` that this run does not write are removed.
+ */
+export async function createFolderWriter(
+  root?: FileSystemDirectoryHandle,
+  pruneUnder?: string
+): Promise<DatasetWriter> {
   const target = root ?? (await pickDirectory("readwrite"));
   const written = new Set<string>();
   return {
@@ -90,7 +87,7 @@ export async function createFolderWriter(root?: FileSystemDirectoryHandle): Prom
       written.add(path);
     },
     async finish() {
-      await pruneAudio(target, written);
+      if (pruneUnder !== undefined) await pruneUnwritten(target, pruneUnder, written);
     },
   };
 }
@@ -115,4 +112,16 @@ export function createZipWriter(fileName: string): DatasetWriter {
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     },
   };
+}
+
+export type ExportTarget = "folder" | "zip";
+
+/** A folder writer when the browser can pick one and the caller asked for it, else a ZIP download. */
+export async function writerFor(
+  target: ExportTarget,
+  stem: string,
+  pruneUnder?: string
+): Promise<DatasetWriter> {
+  if (target === "folder" && canPickDirectory()) return createFolderWriter(undefined, pruneUnder);
+  return createZipWriter(`${stem}-${new Date().toISOString().slice(0, 10)}.zip`);
 }

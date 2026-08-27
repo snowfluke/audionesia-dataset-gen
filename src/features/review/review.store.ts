@@ -8,14 +8,14 @@ import { decodeWav } from "../../lib/audio/wav-encode.ts";
 import {
   deleteClip,
   getClipAudio,
-  listClipsBySpeakerStatus,
+  listClipsByWorkspaceStatus,
   setClipStatus,
 } from "../../lib/db/clip.repository.ts";
 import type { Clip, ClipStatus } from "../../lib/db/schema.ts";
 import { registerShortcuts } from "../../lib/shortcuts.ts";
 import { bumpClips, clipsVersion } from "../library/library.store.ts";
 import { settings } from "../settings/settings.store.ts";
-import { currentSpeakerId } from "../speakers/speakers.store.ts";
+import { currentWorkspace } from "../workspaces/workspaces.store.ts";
 
 export const REVIEW_FILTERS: readonly { id: ClipStatus; label: string }[] = [
   { id: "pending", label: "Menunggu" },
@@ -42,7 +42,7 @@ export type ReviewStore = {
   remove: () => Promise<void>;
 };
 
-/** Call inside the Dengarkan view. Lists the current speaker's clips by status, oldest first. */
+/** Call inside the Dengarkan view. Lists the open workspace's clips by status, oldest first. */
 export function createReviewStore(): ReviewStore {
   const [filter, setFilter] = createSignal<ClipStatus>("pending");
   const [batchDone, setBatchDone] = createSignal(0);
@@ -52,9 +52,9 @@ export function createReviewStore(): ReviewStore {
 
   const clips = createMemo(async (): Promise<Clip[]> => {
     clipsVersion();
-    const speakerId = currentSpeakerId();
-    if (speakerId === null) return [];
-    const rows = await listClipsBySpeakerStatus(speakerId, filter());
+    const workspace = currentWorkspace();
+    if (workspace === null) return [];
+    const rows = await listClipsByWorkspaceStatus(workspace.id, filter());
     rows.sort((a, b) => a.seq - b.seq);
     return rows;
   });

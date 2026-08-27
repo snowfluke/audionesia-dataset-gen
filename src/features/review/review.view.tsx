@@ -13,23 +13,19 @@ import Waveform from "../../components/waveform.tsx";
 import { formatCount, formatSeconds } from "../../lib/format.ts";
 import BatchDots from "../record/batch-dots.tsx";
 import { settings } from "../settings/settings.store.ts";
-import { currentSpeakerId } from "../speakers/speakers.store.ts";
 import { REVIEW_FILTERS, createReviewStore } from "./review.store.ts";
 
 export default function ReviewView(): JSX.Element {
   const store = createReviewStore();
   const [confirmDelete, setConfirmDelete] = createSignal(false);
   const emptyCopy = (): string => {
-    if (store.filter() === "approved") return "Belum ada klip yang disetujui untuk pembicara ini.";
-    if (store.filter() === "rejected") return "Belum ada klip yang ditolak untuk pembicara ini.";
-    return "Tidak ada klip yang menunggu tinjauan untuk pembicara ini.";
+    if (store.filter() === "approved") return "Belum ada klip yang disetujui di dataset ini.";
+    if (store.filter() === "rejected") return "Belum ada klip yang ditolak di dataset ini.";
+    return "Tidak ada klip yang menunggu tinjauan di dataset ini.";
   };
 
   return (
     <div class="flex flex-col gap-4">
-      <Show when={currentSpeakerId() === null}>
-        <Banner variant="alert">Pilih pembicara dulu untuk meninjau klipnya.</Banner>
-      </Show>
       <div class="flex flex-wrap items-center justify-between gap-3">
         <Tabs
           items={REVIEW_FILTERS}
@@ -42,14 +38,7 @@ export default function ReviewView(): JSX.Element {
         </p>
       </div>
       <Loading fallback={<p class="text-kumo-subtle">Memuat klip...</p>}>
-        <Show
-          when={store.current()}
-          fallback={
-            <Show when={currentSpeakerId() !== null}>
-              <Banner>{emptyCopy()}</Banner>
-            </Show>
-          }
-        >
+        <Show when={store.current()} fallback={<Banner>{emptyCopy()}</Banner>}>
           {(clip) => (
             <LayerCard class="flex flex-col gap-4">
               <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-kumo-subtle">

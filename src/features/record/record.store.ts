@@ -6,7 +6,7 @@ import type { Playback } from "../../lib/audio/playback.ts";
 import { playSamples } from "../../lib/audio/playback.ts";
 import { analyzeTake } from "../../lib/audio/trim-silence.ts";
 import { encodeWav } from "../../lib/audio/wav-encode.ts";
-import { listClipsBySpeaker, saveClip } from "../../lib/db/clip.repository.ts";
+import { listClipsByWorkspace, saveClip } from "../../lib/db/clip.repository.ts";
 import { requestPersistentStorage } from "../../lib/db/database.ts";
 import type { ScriptRow } from "../../lib/db/schema.ts";
 import { listScripts } from "../../lib/db/script.repository.ts";
@@ -15,7 +15,7 @@ import { estimateSeconds } from "../../lib/duration.ts";
 import { registerShortcuts } from "../../lib/shortcuts.ts";
 import { bumpClips, clipsVersion, scriptsVersion } from "../library/library.store.ts";
 import { settings, updateSettings } from "../settings/settings.store.ts";
-import { currentSpeakerId } from "../speakers/speakers.store.ts";
+import { currentWorkspace } from "../workspaces/workspaces.store.ts";
 import { createCapture } from "./record.capture.ts";
 import type { InputDevice, Level } from "./recorder.ts";
 
@@ -72,12 +72,12 @@ export function createRecordStore(): RecordStore {
     refresh();
     scriptsVersion();
     clipsVersion();
-    const speakerId = currentSpeakerId();
-    if (speakerId === null) return [];
+    const workspace = currentWorkspace();
+    if (workspace === null) return [];
     const [scripts, clips, skipped] = await Promise.all([
       listScripts(),
-      listClipsBySpeaker(speakerId),
-      listSkippedScriptIds(speakerId),
+      listClipsByWorkspace(workspace.id),
+      listSkippedScriptIds(workspace.id),
     ]);
     const done = new Set(
       clips.filter((clip) => clip.status !== "rejected").map((clip) => clip.scriptId)
@@ -150,8 +150,8 @@ export function createRecordStore(): RecordStore {
   async function save(): Promise<void> {
     const script = current();
     const taken = take();
-    const speakerId = currentSpeakerId();
-    if (script === undefined || taken === null || speakerId === null || phase() !== "review")
+    const workspace = currentWorkspace();
+    if (script === undefined || taken === null || workspace === null || phase() !== "review")
       return;
     const blocker = saveBlocker();
     if (blocker !== null) throw new Error(blocker);
@@ -159,7 +159,8 @@ export function createRecordStore(): RecordStore {
     const wav = new Blob([encodeWav(taken.samples, taken.sampleRate)], { type: "audio/wav" });
     const clip = {
       id: crypto.randomUUID(),
-      speakerId,
+      workspaceId: workspace.id,
+      speakerId: workspace.speaker.id,
       scriptId: script.id,
       status: "pending" as const,
       text: script.text,
@@ -191,9 +192,9 @@ export function createRecordStore(): RecordStore {
 
   async function skip(): Promise<void> {
     const script = current();
-    const speakerId = currentSpeakerId();
-    if (script === undefined || speakerId === null) return;
-    await skipScript(speakerId, script.id);
+    const workspace = currentWorkspace();
+    if (script === undefined || workspace === null) return;
+    await skipScript(workspace.id, script.id);
     setRefresh((n) => n + 1);
   }
 

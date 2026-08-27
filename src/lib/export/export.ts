@@ -1,22 +1,23 @@
 import { attributionMarkdown } from "../corpus/attribution.ts";
 import type { CorpusSource } from "../corpus/schema.ts";
-import { listClipsByStatus } from "../db/clip.repository.ts";
+import { listClipsByWorkspaceStatus } from "../db/clip.repository.ts";
 import type { Clip, ScriptRow, Speaker } from "../db/schema.ts";
 import { getScript } from "../db/script.repository.ts";
 import { getSentences, listSentences } from "../db/sentence.repository.ts";
-import { listSpeakers } from "../db/speaker.repository.ts";
+import { listWorkspaces } from "../db/workspace.repository.ts";
 import type { LicenseMode } from "../settings.ts";
 import { cc0ScriptIds, exportClip } from "./export-clips.ts";
 import { jsonl, oodLines, pocketTtsLists, styleTts2Lists } from "./export-lists.ts";
-import type { ExportRow } from "./manifest.ts";
+import type { ExportFormat, ExportRow } from "./manifest.ts";
 import { DATASET_ROOT, hfMetadataLine, speakersJsonlLine } from "./manifest.ts";
 import type { DatasetWriter } from "./writer.ts";
 
-export const EXPORT_FORMATS = ["hf", "styletts2", "pocket-tts"] as const;
-export type ExportFormat = (typeof EXPORT_FORMATS)[number];
+export { EXPORT_FORMATS } from "./manifest.ts";
+export type { ExportFormat } from "./manifest.ts";
 
 export type ExportOptions = {
   writer: DatasetWriter;
+  workspaceId: string;
   formats: ReadonlySet<ExportFormat>;
   sampleRate: number;
   normalizePeakDbfs: number | null;
@@ -90,11 +91,21 @@ function speakerEntry(speaker: Speaker, index: number): SpeakerEntry {
   };
 }
 
-/** Writes every approved clip and the manifests the chosen formats need. */
+/**
+ * Writes every approved clip of one workspace and the manifests the chosen
+ * formats need. `speaker_id` is the workspace's index in creation order, so it
+ * stays stable when several workspaces export into one dataset folder.
+ */
 export async function exportDataset(options: ExportOptions): Promise<ExportReport> {
-  const [approved, speakers] = await Promise.all([listClipsByStatus("approved"), listSpeakers()]);
-  approved.sort((a, b) => a.speakerId.localeCompare(b.speakerId) || a.seq - b.seq);
-  const speakerIndex = new Map(speakers.map((speaker, index) => [speaker.id, index]));
+  const [approved, workspaces] = await Promise.all([
+    listClipsByWorkspaceStatus(options.workspaceId, "approved"),
+    listWorkspaces(),
+  ]);
+  approved.sort((a, b) => a.seq - b.seq);
+  const index = workspaces.findIndex((workspace) => workspace.id === options.workspaceId);
+  const workspace = workspaces[index];
+  if (workspace === undefined) throw new Error("Dataset tidak ditemukan");
+  const speakerIndex = Math.max(0, index);
   const warnings: string[] = [];
   let skipped = 0;
 
@@ -108,7 +119,7 @@ export async function exportDataset(options: ExportOptions): Promise<ExportRepor
 
   const rows: ExportRow[] = [];
   for (const [done, clip] of clips.entries()) {
-    const result = await exportClip(clip, speakerIndex.get(clip.speakerId) ?? 0, {
+    const result = await exportClip(clip, speakerIndex, {
       writer: options.writer,
       sampleRate: options.sampleRate,
       normalizePeakDbfs: options.normalizePeakDbfs,
@@ -143,6 +154,7 @@ export async function exportDataset(options: ExportOptions): Promise<ExportRepor
   }
   const manifest = {
     app_version: options.appVersion,
+    dataset_name: workspace.name,
     exported_at: new Date().toISOString(),
     sample_rate: options.sampleRate,
     peak_dbfs: options.normalizePeakDbfs,
@@ -151,7 +163,7 @@ export async function exportDataset(options: ExportOptions): Promise<ExportRepor
     skipped,
     total_seconds: Math.round(rows.reduce((sum, row) => sum + row.durationSec, 0)),
     g2p_versions: [...new Set(clips.map((clip) => clip.g2pVersion))],
-    speakers: speakers.map((speaker, index) => speakerEntry(speaker, index)),
+    speakers: [speakerEntry(workspace.speaker, speakerIndex)],
     styletts2_root_path: "set data_params.root_path to the dataset/ directory",
     pocket_tts_cwd:
       "paths are relative to dataset/; run training with dataset/ as the working directory",

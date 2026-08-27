@@ -13,7 +13,7 @@ import Waveform from "../../components/waveform.tsx";
 import { amplitudeToDbfs } from "../../lib/audio/level.ts";
 import { formatCount, formatSeconds } from "../../lib/format.ts";
 import { settings } from "../settings/settings.store.ts";
-import { currentSpeakerId } from "../speakers/speakers.store.ts";
+import { setTab } from "../workspaces/navigation.store.ts";
 import BatchDots from "./batch-dots.tsx";
 import { createRecordStore } from "./record.store.ts";
 
@@ -59,18 +59,16 @@ export default function RecordView(): JSX.Element {
 
   return (
     <div class="flex flex-col gap-4">
-      <Show when={currentSpeakerId() === null}>
-        <Banner variant="alert">Pilih atau buat pembicara dulu di bagian atas halaman.</Banner>
-      </Show>
       <Loading fallback={<p class="text-kumo-subtle">Memuat antrean naskah...</p>}>
         <Show
           when={store.current()}
           fallback={
-            <Show when={currentSpeakerId() !== null}>
-              <Banner>
-                Semua naskah sudah direkam atau dilewati. Tambahkan teks di tab Tulis.
-              </Banner>
-            </Show>
+            <Banner>
+              <span class="flex-1">Semua naskah sudah direkam atau dilewati.</span>
+              <Button size="sm" onClick={() => setTab("write")}>
+                Tambahkan teks sendiri
+              </Button>
+            </Banner>
           }
         >
           {(script) => (
@@ -88,6 +86,17 @@ export default function RecordView(): JSX.Element {
               <Show when={settings().showPhonemes}>
                 <p class="font-mono text-base text-kumo-subtle">{script().phonemes}</p>
               </Show>
+              <p class="text-xs text-kumo-subtle">
+                Ingin membaca teks Anda sendiri?{" "}
+                <button
+                  type="button"
+                  class="text-kumo-link hover:underline"
+                  onClick={() => setTab("write")}
+                >
+                  Tambahkan di tab Teks sendiri
+                </button>
+                ; naskahnya masuk ke urutan pertama antrean ini.
+              </p>
             </LayerCard>
           )}
         </Show>
@@ -147,11 +156,7 @@ export default function RecordView(): JSX.Element {
           <Button
             variant={mainVariant()}
             size="lg"
-            disabled={
-              store.phase() === "arming" ||
-              store.phase() === "saving" ||
-              currentSpeakerId() === null
-            }
+            disabled={store.phase() === "arming" || store.phase() === "saving"}
             onClick={onMainButton}
           >
             {recordLabel()}
