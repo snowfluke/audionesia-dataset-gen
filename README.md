@@ -10,15 +10,22 @@ Build an Indonesian text-to-speech training dataset in the browser. Audionesia s
 
 ## What it does
 
-| Tab          | Job                                                                                                  |
-| ------------ | ---------------------------------------------------------------------------------------------------- |
-| `Rekam`      | Reads one 10 to 30 s script at a time, records with browser audio processing off, trims silence.     |
-| `Dengarkan`  | Plays each pending clip; `Ya` approves, `Tidak` rejects. Only approved clips export.                 |
-| `Tulis`      | Paste or drop your own text (`.txt`, `.tsv`, `.jsonl`); it is phonemized and added to the pool.      |
-| `Dataset`    | Coverage of phones, diphones, and spelling phenomena; per-speaker counts; export to folder or ZIP.   |
-| `Pengaturan` | Duration window presets per trainer, silence threshold, export sample rate, speech-rate calibration. |
+| Tab          | Job                                                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Rekam`      | One script at a time, microphone picker, level meter, raw capture with browser audio processing off, silence trim, waveform of the take.    |
+| `Dengarkan`  | Play each clip; `Ya` approves, `Tidak` rejects. Filters for pending, approved, and rejected clips; re-queue a script; optional ASR check.   |
+| `Tulis`      | Paste or drop your own text (`.txt`, `.tsv`, `.jsonl`); it is filtered, phonemized, and added to the pool.                                  |
+| `Dataset`    | Progress toward a target, coverage of phones, diphones, and spelling phenomena, export, backup and restore, ASR check of all pending clips. |
+| `Pengaturan` | Trainer presets, duration window, silence and clipping gates, export sample rate and peak level, speech-rate calibration, ASR model.        |
 
-Scripts are built by a greedy set cover over the pool's coverage units, so the rarest sounds are read first. Phonemes come from [indo-g2p](https://github.com/snowfluke/indo-g2p), the same library used at export time, and every phoneme string is stored with the library version that produced it.
+Scripts are built by a greedy set cover over the pool's coverage units, so the rarest sounds are read first; each script stays within one text source so it reads as one voice. Phonemes come from [indo-g2p](https://github.com/snowfluke/indo-g2p), and every phoneme string is stored with the library version that produced it.
+
+## Before you record
+
+- **StyleTTS2** ships an English-only PL-BERT ("it probably does not work very well on other languages", per its README). Train or find an Indonesian PL-BERT before fine-tuning on this dataset. StyleTTS2 also crops training audio to 5 s by default and rejects phoneme strings over 512 tokens, so pick the `StyleTTS2 (5-15 s)` preset in `Pengaturan` and rebuild scripts before recording for it.
+- **PocketTTS** has no Indonesian model; its new-language path needs an Indonesian tokenizer and a forced aligner (see its `training/README.md`), and its authors size such a run at 100 hours or more. The default `PocketTTS (10-30 s)` preset targets it.
+- **Licensing.** Only Common Voice (CC0) and generated text are free of obligations. Tatoeba text is CC BY 2.0 FR and Wikipedia text is CC BY-SA 4.0; a dataset or model built on them carries attribution and, for BY-SA, share-alike questions. `Pengaturan` has a CC0-only export mode, and every export writes `ATTRIBUTION.md`.
+- **Back up.** Browsers can evict local storage. The Dataset tab backs up every clip's master audio to a folder or ZIP and restores it on any machine.
 
 ## Quickstart
 
@@ -31,31 +38,36 @@ bun install              # also installs the git hooks
 bun run dev              # http://localhost:5173
 ```
 
-The first load seeds the bundled pool (35,753 phonemized entries) into IndexedDB and builds the scripts. Create a speaker, allow the microphone, press Space.
+The first load seeds the bundled pool (30,071 phonemized entries) into IndexedDB and builds the scripts; a redeployed pool reseeds itself. Create a speaker (name, optional gender, age range, dialect, microphone, and the consent checkbox), allow the microphone, press Space.
 
 Verify a change:
 
 ```bash
 bun run complete-check   # type-check, lint, fmt, test, build
-bun run smoke            # Playwright drives Chrome through record, review, export; needs bun run dev
+bun run smoke            # Playwright drives Chrome through record, review, export, backup; needs bun run dev
 ```
 
 ## Export layout
 
 ```
 dataset/
-  audio/<speaker>/clip_0001.wav    # mono 16-bit, 24 kHz by default
+  audio/<speaker>/clip_0001.wav    # mono 16-bit, 24 kHz by default, DC removed, peak -3 dBFS
   speakers.jsonl                   # {"hash","path","text","phonemes","duration","speaker"}
-  metadata.jsonl                   # Hugging Face audiofolder (file_name, text, phonemes, speaker, duration)
-  styletts2/train_list.txt         # path|phonemes|speaker_id, plus val_list.txt and OOD_texts.txt
+  metadata.jsonl                   # Hugging Face audiofolder (file_name, text, phonemes, speaker, duration, split)
+  styletts2/train_list.txt         # path|phonemes|speaker_id, plus val_list.txt and sentence-level OOD_texts.txt
   pocket-tts/train.jsonl           # {"path","duration","transcript"}, plus valid.jsonl
-  manifest.json                    # sample rate, counts, g2p versions, speaker id table
+  manifest.json                    # sample rate, counts, g2p versions, speakers with metadata, warnings count
+  export-warnings.txt              # every clip a trainer would reject, with the reason
   ATTRIBUTION.md                   # license and credit for every text source used
 ```
 
-`hash` is the first 16 hex characters of the SHA-256 of the exported WAV. On Chromium the app writes straight into a folder you pick; other browsers get a ZIP.
+`hash` is the first 16 hex characters of the SHA-256 of the exported WAV. Train/validation membership is a hash of the clip id, so it never changes between exports. Only approved clips export; clips shorter than the minimum, or whose text is not CC0 in CC0 mode, are skipped and listed. On Chromium the app writes straight into a folder you pick and prunes WAVs of clips that no longer exist; other browsers get a ZIP.
 
-Trainer notes: StyleTTS2 crops training audio to 5 s by default and rejects phoneme strings over 512 tokens, so pick the `StyleTTS2 (5-15 s)` preset in `Pengaturan` and rebuild scripts before recording for it. PocketTTS takes files up to 30 s; the default `PocketTTS (10-30 s)` preset targets it. PocketTTS has no Indonesian model yet, so training it is the new-language path, which its authors size at 100 hours or more.
+## Quality gates
+
+- Clipped takes cannot be saved (switchable). Each take shows its peak and the signal-to-noise ratio of the leading silence.
+- Takes stop themselves after 90 s; a disconnected microphone or a paused audio context aborts the take with a message.
+- The in-browser ASR check runs Whisper (`onnx-community/whisper-base` by default, WebGPU when available) on a clip or on every pending clip and flags transcripts that differ from the script by more than 20%.
 
 ## Corpus
 
@@ -70,7 +82,7 @@ bun run corpus:llm 5           # Claude-written paragraphs for the least-covered
 bun run corpus:build           # normalize, filter, dedup, phonemize -> pool.jsonl, index.json, ATTRIBUTION.md
 ```
 
-`corpus/raw/` is not committed. The current pool holds 35,753 entries, 991 coverage units, and about 55 hours of reading text; `public/corpus/ATTRIBUTION.md` lists what each source requires of a derived dataset.
+The build drops fragments under four words and lines that indo-g2p reads mostly as English. `corpus/raw/` is not committed. The current pool holds 30,071 entries, 989 coverage units, and about 52 hours of reading text; `public/corpus/ATTRIBUTION.md` lists what each source requires of a derived dataset.
 
 ## Repository map
 
@@ -80,8 +92,8 @@ audionesia-dataset-gen/
 │   ├── app.tsx  main.tsx        # shell: header, speaker picker, tabs, help dialogs
 │   ├── components/              # Kumo-styled Solid components, one per file
 │   ├── features/                # record, review, write, dataset, settings, speakers, library
-│   ├── lib/                     # audio, corpus, db, export, g2p: pure logic and repositories
-│   └── workers/                 # G2P worker, script-builder worker, recorder worklet
+│   ├── lib/                     # audio, asr, backup, corpus, db, export, g2p, text: pure logic and repositories
+│   └── workers/                 # G2P worker, script-builder worker, ASR worker, recorder worklet
 ├── public/corpus/               # generated pool (committed)
 ├── scripts/corpus/              # fetch and build scripts
 ├── scripts/smoke.ts             # browser smoke test
@@ -90,7 +102,7 @@ audionesia-dataset-gen/
 └── .claude/skills/              # solidjs-2 and kumo-design skills for agents
 ```
 
-Stack: SolidJS 2.0 (release candidate, pinned), Vite 8, Tailwind CSS 4 with Cloudflare Kumo tokens, `idb`, `zod`, `fflate`, `indo-g2p`; Bun, oxlint, oxfmt, lefthook.
+Stack: SolidJS 2.0 (release candidate, pinned), Vite 8, Tailwind CSS 4 with Cloudflare Kumo tokens, `idb`, `zod`, `fflate`, `indo-g2p`, `@huggingface/transformers` (ASR only); Bun, oxlint, oxfmt, lefthook.
 
 ## Documentation
 

@@ -59,6 +59,10 @@ Walk every item for every pull request. Each item holds, or it is a finding. Ite
 - [ ] StyleTTS2 output passes the symbol mapping and length check (§11).
 - [ ] Every corpus source carries a license entry and appears in `ATTRIBUTION.md` (§11).
 - [ ] Duration window and syllable rate are settings, not constants (§11).
+- [ ] Train/validation split comes from `splitFor(clipId)`, never a position (§11).
+- [ ] A script rebuild keeps scripts that clips reference; a pool reseed updates the `library` row (§11).
+- [ ] Settings writes go through `updateSettings` and its schema check (§5).
+- [ ] Backup and restore round-trip every field of the row types (§5).
 
 ## 7. Tests
 

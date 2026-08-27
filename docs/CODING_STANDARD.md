@@ -125,13 +125,16 @@ src/
   components/<name>.tsx       one Solid component per file, styled with Kumo class strings
   lib/
     db/                       idb schema, one repository per store
-    audio/                    wav-encode, trim-silence, resample, hash
+    asr/                      Whisper worker client, clip check, character error rate
+    audio/                    wav-encode, trim-silence (SNR), level, normalize, resample, playback
+    backup/                   database backup and restore
     corpus/                   pool loader, coverage units, script builder
     export/                   line serializers, DatasetWriter, folder and zip writers
     g2p/                      worker message contract and main-thread client
+    text/                     normalizeForCer, levenshtein, characterErrorRate
     duration.ts  slug.ts  settings.ts
   workers/
-    g2p.worker.ts  builder.worker.ts  recorder.worklet.ts
+    g2p.worker.ts  builder.worker.ts  asr.worker.ts  recorder.worklet.ts
   styles/app.css
 ```
 
@@ -224,7 +227,8 @@ createEffect(() => {
 - Audio blobs live in the `audio` store, keyed by clip id, separate from clip metadata, so listing clips never loads audio.
 - A write that touches more than one store runs in one transaction. Example: saving a clip writes `clips` and `audio`, and bumps `speakers.nextSeq`, in one `readwrite` transaction.
 - `navigator.storage.persist()` is requested before the first write.
-- Rows the app wrote are trusted by their schema version. Data from outside (imported files, the corpus pool, pasted text) is parsed with Zod before it reaches a repository.
+- Rows the app wrote are trusted by their schema version. Data from outside (imported files, the corpus pool, pasted text, backup files) is parsed with Zod before it reaches a repository.
+- Settings are validated with `appSettingsSchema` on every write (`updateSettings`); on read, invalid fields fall back to defaults one by one, never the whole row.
 
 ```typescript
 // Correct
@@ -348,6 +352,13 @@ These rules protect the training data. Breaking one produces a dataset that look
 - Every phoneme string is stored next to the `g2pVersion` that produced it (`VERSION` from `indo-g2p`). A pool built with another version is rebuilt, not patched.
 - Only clips with `status === "approved"` export. The status machine is: `pending -> approved`, `pending -> rejected`, `approved -> rejected`; `approved` and `rejected` are terminal for export purposes.
 - `hash` is the first 16 hex characters of SHA-256 over the exported WAV bytes (after resampling), never over the stored master.
+- Train or validation membership is `splitFor(clipId)`, a hash of the clip id. Never assign a split by position in a list.
+- Export removes the DC offset and normalizes the peak to `settings.normalizePeakDbfs`; clips under `settings.minClipSec` are skipped and listed in `export-warnings.txt`.
+- StyleTTS2 `speaker_id` is the index in `createdAt` order; `listSpeakers` sorts, never the caller.
+- A clipped take cannot be saved while `rejectClipped` is on. `snrDb` is measured from the leading silence of the take.
+- Scripts never mix text sources. `rebuildScripts` keeps old scripts that clips reference, so `clip.scriptId` never dangles.
+- Seeding is complete only when the `library` settings row matches the served `index.json`; a mismatch reseeds and remaps Tulis sentences.
+- The ASR check (`lib/asr`) stores `asrText` and `asrCer` on the clip; it flags, it never changes a clip's status.
 - `path` is `dataset/audio/<speaker>/clip_<seq>.wav` with `seq` zero-padded to four digits per speaker.
 - Export formats are pure line serializers in `src/lib/export/` that take rows and return strings; one `DatasetWriter` (folder or zip) writes bytes. Serializers never touch the file system.
 - StyleTTS2 lines pass through the symbol mapping (`-` to space, strip `'()`, `é` to `e`) and the symbol-table check before writing. A line over 500 phoneme characters is refused with a message, not silently truncated.

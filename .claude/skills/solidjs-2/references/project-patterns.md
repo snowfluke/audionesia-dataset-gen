@@ -18,9 +18,10 @@ Views hold JSX and view-local state. Stores own feature state and every action. 
 const [settings, setSettings] = createSignal<AppSettings>(DEFAULT_SETTINGS);
 export { settings };
 export async function updateSettings(patch: Partial<AppSettings>): Promise<void> {
-  const next = { ...settings(), ...patch };
-  await saveSettings(next);
-  setSettings(next);
+  const parsed = appSettingsSchema.safeParse({ ...settings(), ...patch }); // validate before persisting
+  if (!parsed.success) throw new Error("Pengaturan tidak valid");
+  await saveSettings(parsed.data);
+  setSettings(parsed.data);
 }
 ```
 
@@ -69,10 +70,10 @@ export function createReviewStore(): ReviewStore {
 ## Event handlers and async work
 
 ```tsx
-<Button onClick={() => attempt(store.save)}>Simpan</Button>
+<Button onClick={() => void attempt(store.save)}>Simpan</Button>
 ```
 
-`attempt` (in `src/components/toast.tsx`) awaits the task and reports failures with a toast, so handlers never leave a floating promise and never chain `.catch`.
+`attempt` (in `src/components/toast.tsx`) is `async`: it awaits the task and reports failures with a toast, so handlers never chain `.catch`. Prefix the call with `void` in a handler that does not await it. An inner arrow passed to `attempt` must not read `props`; capture `const store = props.store` in the handler first, or `solid/reactivity` flags it.
 
 ## Components
 

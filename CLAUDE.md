@@ -96,7 +96,8 @@ Name the terminal states.
 | Storage    | IndexedDB through `idb` 8, database `audionesia`                                              |
 | Validation | `zod` 4 at trust boundaries only                                                              |
 | Phonemes   | `indo-g2p` 0.1.2 (full entry) inside a Web Worker; pool pre-phonemized offline                |
-| Export     | File System Access API, `fflate` ZIP fallback                                                 |
+| Export     | File System Access API (prunes stale WAVs), `fflate` ZIP fallback                             |
+| ASR check  | `@huggingface/transformers` 4.2 Whisper in a worker, loaded on first use only                 |
 | Quality    | `oxlint` 1.80 (+ vendored anti-slop, `eslint-plugin-solid` v2 rules), `oxfmt` 0.65, lefthook  |
 | Smoke      | Playwright driving system Google Chrome with a fake microphone                                |
 
@@ -113,13 +114,16 @@ audionesia-dataset-gen/
       dataset/  settings/          # Dataset (stats, export), Pengaturan (knobs)
       speakers/ library/           # global stores: speakers, pool seeding, script build
     lib/
-      audio/                       # wav-encode, trim-silence, level, resample, playback
+      asr/                         # Whisper worker client, clip check with character error rate
+      audio/                       # wav-encode, trim-silence (SNR), level, normalize, resample, playback
+      backup/                      # database backup and restore (folder or ZIP)
       corpus/                      # schema, filter, split, coverage, script-builder, pool-loader, import
       db/                          # idb schema + one repository per store
       export/                      # manifest serializers, styletts2-symbols, writer, export
       g2p/                         # worker message contract + client
+      text/                        # normalizeForCer, levenshtein, characterErrorRate
       duration.ts hash.ts settings.ts shortcuts.ts slug.ts theme.ts format.ts worker-rpc.ts
-    workers/                       # g2p.worker.ts, builder.worker.ts, recorder.worklet.ts
+    workers/                       # g2p.worker.ts, builder.worker.ts, asr.worker.ts, recorder.worklet.ts
     styles/app.css                 # @import "tailwindcss" then Kumo tokens
   public/corpus/                   # pool.jsonl, index.json, ATTRIBUTION.md (generated, committed)
   corpus/sources.json              # news feeds for scrape-news; corpus/raw/ is gitignored
@@ -251,11 +255,15 @@ Identifiers English. UI copy Bahasa Indonesia, in view files. Thrown `Error` mes
 - Never `MediaRecorder`. Capture through `recorder.worklet.ts`; `getUserMedia` has echo cancellation, noise suppression, and auto gain **off**, mono.
 - Store the real capture `sampleRate` on the clip. `durationSec` is measured from trimmed PCM.
 - Master WAV: 16-bit mono at capture rate, silence trimmed (`-45 dBFS`, `150 ms` padding, both settings). Export resamples to `settings.exportSampleRate` (default 24000).
-- `hash` = first 16 hex of SHA-256 of the **exported** WAV bytes. `path` = `dataset/audio/<speaker>/clip_<seq 4 digits>.wav`.
+- `hash` = first 16 hex of SHA-256 of the **exported** WAV bytes. `path` = `dataset/audio/<speaker>/clip_<seq 4 digits>.wav`. Train/validation = `splitFor(clipId)`, a hash of the clip id, never a position.
+- Export removes DC offset and normalizes the peak to `settings.normalizePeakDbfs` (default -3, null keeps the master level); clips under `settings.minClipSec` are skipped; `licenseMode: "cc0"` keeps only clips whose sentences all come from `CC0_SOURCES`.
 - `speakers.jsonl` line = `{"hash","path","text","phonemes","duration","speaker"}` exactly; extra formats are separate files.
 - StyleTTS2: map `-` to space, strip `'()`, `é` to `e`, refuse lines over 500 phoneme chars, skip speakers with fewer than 2 clips, `speaker_id` = creation index, `root_path` = `dataset/`. PocketTTS: `{"path","duration","transcript"}` with 30 s max.
 - Every phoneme string travels with its `g2pVersion`; clips freeze `text` and `phonemes` at record time.
-- Script id = hash of its sentence ids; rebuilding scripts keeps ids for unchanged sentence sets.
+- Script id = hash of its sentence ids; `rebuildScripts` keeps old scripts that clips still reference, so a clip never dangles. Scripts never mix text sources (`DEFAULT_SAME_SOURCE_TOLERANCE = 0`).
+- Seeding is complete only when the `library` row in `settings` matches the served `index.json` (`poolCount`, `g2pVersion`); a mismatch reseeds and remaps Tulis sentences onto the new unit table.
+- A clipped take cannot be saved while `settings.rejectClipped` is on; `snrDb` comes from the leading silence of the take.
+- StyleTTS2 `speaker_id` = index in `createdAt` order (`listSpeakers` sorts); speakers carry optional gender, age range, dialect, microphone, and `consentAt`.
 - Coverage units are `p:<phone>`, `d:<a>.<b>` (with `#` boundary), `f:<phenomenon>`; ids index the `units` store and `index.json`.
 - Duration window and syllable rate are settings with presets (`pocket-tts` 10-30 s, `styletts2` 5-15 s). Default `syllablesPerSecond` 4.5 is a calibration knob, fitted from approved clips.
 
@@ -304,7 +312,10 @@ If context was compacted, re-verify:
 - [ ] Only `approved` clips export; StyleTTS2 needs 2 clips per speaker and lines under 500 chars; PocketTTS max 30 s.
 - [ ] Pool is generated offline (`corpus:*` then `corpus:build`) and committed under `public/corpus/`; `corpus/raw/` is not.
 - [ ] `g2pVersion` stamped on pool rows, scripts, and clips; script ids hash their sentence ids.
-- [ ] IndexedDB `audionesia` v1 stores: speakers, sentences, scripts, clips, audio, skips, settings, units.
+- [ ] IndexedDB `audionesia` v1 stores: speakers, sentences, scripts, clips, audio, skips, settings (`app` + `library` rows), units.
+- [ ] Train/validation split hashes the clip id; speakers order by `createdAt`; rebuilds keep referenced scripts; scripts are single-source.
+- [ ] Backup = speakers, clips + master WAVs, skips, settings, Tulis sentences (`lib/backup`); restore merges, never overwrites.
+- [ ] ASR check = Whisper in `asr.worker.ts`, 16 kHz input, CER via `lib/text/cer.ts`, results on `clip.asrCer` / `clip.asrText`.
 - [ ] Settings presets: `pocket-tts` 10-30 s (default), `styletts2` 5-15 s; syllable rate 4.5 default, fitted per speaker.
 - [ ] Kumo look, hand-rolled Solid components; `data-mode` dark mode; 14 px body text, sentence-case headings, `font-semibold`.
 - [ ] UI Bahasa Indonesia; identifiers, dataset fields, and logs English.
@@ -320,6 +331,7 @@ bun run preview
 
 bun run complete-check         # type-check + lint + fmt + test + build
 bun run smoke                  # Playwright + Chrome fake mic; needs bun run dev
+bun run banner                 # re-render assets/banner.png from the pool
 
 bun run corpus:common-voice    # CC0 Common Voice sentences -> corpus/raw/
 bun run corpus:tatoeba         # CC-BY Tatoeba sentences with attribution
