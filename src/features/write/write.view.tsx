@@ -7,6 +7,7 @@ import InputArea from "../../components/input-area.tsx";
 import LayerCard from "../../components/layer-card.tsx";
 import { Cell, Head, Row, Table } from "../../components/table.tsx";
 import { attempt } from "../../components/toast.tsx";
+import { SAMPLE_FILES, sampleDataUrl } from "../../lib/corpus/sample-text.ts";
 import { formatCount } from "../../lib/format.ts";
 import { REJECT_LABELS, createWriteStore } from "./write.store.ts";
 
@@ -26,10 +27,15 @@ export default function WriteView(): JSX.Element {
 
   return (
     <div class="flex flex-col gap-4">
-      <p class="text-base text-kumo-subtle">
-        Tempel kalimat atau paragraf bahasa Indonesia, satu per baris. Berkas .txt, .tsv (misalnya
-        validated_sentences.tsv dari Common Voice), atau .jsonl bisa dijatuhkan ke kotak ini.
-      </p>
+      <div class="flex flex-col gap-1">
+        <h2 class="text-lg font-semibold text-kumo-strong">Teks sendiri</h2>
+        <p class="text-base text-kumo-subtle">
+          Tambahkan kalimat atau paragraf bahasa Indonesia yang ingin Anda baca sendiri, satu per
+          baris. Teks ini masuk ke kumpulan kalimat dan naskahnya menjadi urutan pertama di antrean
+          Rekam. Berkas .txt, .tsv (misalnya validated_sentences.tsv dari Common Voice), atau .jsonl
+          bisa dijatuhkan ke kotak ini.
+        </p>
+      </div>
       <LayerCard
         class={["flex flex-col gap-3", { "ring-2 ring-kumo-focus": dragging() }]}
         onDragOver={(event) => {
@@ -46,7 +52,7 @@ export default function WriteView(): JSX.Element {
           onInput={(event) => store.setText(event.currentTarget.value)}
           disabled={store.phase() === "analyzing" || store.phase() === "saving"}
         />
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-3">
           <Button
             variant="primary"
             onClick={() => void attempt(store.analyze)}
@@ -68,6 +74,23 @@ export default function WriteView(): JSX.Element {
               }}
             />
           </label>
+          <span class="text-base text-kumo-subtle">
+            Contoh berkas:{" "}
+            <For each={SAMPLE_FILES}>
+              {(file, index) => (
+                <>
+                  <Show when={index() > 0}> · </Show>
+                  <a
+                    class="text-kumo-link hover:underline"
+                    href={sampleDataUrl(file)}
+                    download={file.name}
+                  >
+                    {file.name}
+                  </a>
+                </>
+              )}
+            </For>
+          </span>
         </div>
         <Show when={store.rejected().length > 0}>
           <details class="text-xs text-kumo-subtle">
@@ -102,24 +125,17 @@ export default function WriteView(): JSX.Element {
                 Batal
               </Button>
               <Button
-                variant="outline"
-                onClick={() => void attempt(() => store.commit(true))}
-                disabled={store.phase() === "saving"}
-              >
-                Tambahkan dan susun ulang naskah
-              </Button>
-              <Button
                 variant="primary"
-                onClick={() => void attempt(() => store.commit(false))}
+                onClick={() => void attempt(store.commit)}
                 disabled={store.phase() === "saving"}
               >
-                Tambahkan
+                {store.phase() === "saving" ? "Menyusun naskah..." : "Tambahkan ke antrean Rekam"}
               </Button>
             </div>
           </div>
           <Banner variant="secondary">
-            Menyusun ulang naskah mengganti antrean rekam semua pembicara. Klip yang sudah direkam
-            tidak berubah.
+            Naskah disusun ulang untuk semua dataset; naskah dari teks Anda menjadi urutan pertama.
+            Klip yang sudah direkam tidak berubah.
           </Banner>
           <Table>
             <thead>

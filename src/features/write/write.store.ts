@@ -36,7 +36,8 @@ export type WriteStore = {
   preview: () => Phonemized[];
   rejected: () => RejectedLine[];
   analyze: () => Promise<void>;
-  commit: (rebuild: boolean) => Promise<void>;
+  /** Adds the previewed sentences and rebuilds scripts so they lead the Rekam queue. */
+  commit: () => Promise<void>;
   addFiles: (files: FileList | File[]) => Promise<void>;
   discard: () => void;
 };
@@ -97,7 +98,7 @@ export function createWriteStore(): WriteStore {
     }
   }
 
-  async function commit(rebuild: boolean): Promise<void> {
+  async function commit(): Promise<void> {
     if (phase() !== "previewing") return;
     setPhase("saving");
     try {
@@ -107,10 +108,8 @@ export function createWriteStore(): WriteStore {
           ? `, ${result.duplicates.toLocaleString("id-ID")} sudah ada di kumpulan`
           : "";
       showToast(`${result.added.toLocaleString("id-ID")} kalimat ditambahkan${note}`, "success");
-      if (rebuild) {
-        const count = await rebuildScripts();
-        showToast(`${count.toLocaleString("id-ID")} naskah disusun ulang`, "success");
-      }
+      await rebuildScripts();
+      showToast("Naskah dari teks Anda kini di urutan pertama antrean Rekam", "success");
       setText("");
       setPreview([]);
       setRejected([]);

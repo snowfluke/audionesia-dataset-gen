@@ -88,9 +88,10 @@ async function reseed(index: PoolIndex): Promise<void> {
 }
 
 /**
- * Rebuilds every script from the current pool and window settings. Script ids
- * hash their sentence ids, so unchanged groupings keep their id; old scripts
- * that recorded clips still reference are kept so nothing dangles.
+ * Rebuilds every script from the current pool and window settings. Scripts made
+ * only of the user's own sentences come first in the queue. Script ids hash
+ * their sentence ids, so unchanged groupings keep their id; old scripts that
+ * recorded clips still reference are kept so nothing dangles.
  */
 export async function rebuildScripts(): Promise<number> {
   setPhase("building");
@@ -136,6 +137,12 @@ export async function rebuildScripts(): Promise<number> {
       createdAt,
     });
   }
+  const isUserScript = (row: ScriptRow): boolean =>
+    row.sentenceIds.every((id) => bySentenceId.get(id)?.source === "user");
+  rows.sort((a, b) => Number(isUserScript(b)) - Number(isUserScript(a)) || a.order - b.order);
+  rows.forEach((row, order) => {
+    row.order = order;
+  });
   const newIds = new Set(rows.map((row) => row.id));
   const referenced = new Set(clips.map((clip) => clip.scriptId));
   const kept = oldScripts
