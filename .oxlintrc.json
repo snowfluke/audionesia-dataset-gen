@@ -1,0 +1,97 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "promise"],
+
+  // anti-slop is vendored from https://github.com/dmmulroy/anti-slop (MIT). It
+  // rejects low-evidence patterns an agent reaches for when unsure of a type.
+  // eslint-plugin-solid carries the Solid 2.0 reactivity and migration rules.
+  "jsPlugins": [
+    { "name": "anti-slop", "specifier": "./tools/oxlint/anti-slop/index.ts" },
+    "eslint-plugin-solid"
+  ],
+  "settings": { "solid": { "version": 2 } },
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    // Never silence a type error without a contract. `@ts-expect-error` needs
+    // a reason; `@ts-ignore` and `@ts-nocheck` are banned outright.
+    "typescript/ban-ts-comment": [
+      "error",
+      {
+        "ts-expect-error": "allow-with-description",
+        "ts-ignore": true,
+        "ts-nocheck": true,
+        "ts-check": false
+      }
+    ],
+
+    // Use `unknown` and narrow it.
+    "typescript/no-explicit-any": "error",
+
+    // Exported functions carry explicit return types.
+    "typescript/explicit-module-boundary-types": "error",
+
+    // Prefer `type` over `interface` for data shapes.
+    "typescript/consistent-type-definitions": ["error", "type"],
+
+    // Keep type imports in their own statement.
+    "typescript/consistent-type-imports": [
+      "error",
+      { "prefer": "type-imports", "fixStyle": "separate-type-imports" }
+    ],
+    "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
+
+    // No casts to unrelated types and no `!` assertions. Handle null explicitly.
+    "typescript/no-unsafe-type-assertion": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/use-unknown-in-catch-callback-variable": "error",
+
+    // async/await only. No `.then()` chains, no silent fire-and-forget.
+    "promise/prefer-await-to-then": "error",
+    "promise/no-nesting": "error",
+
+    "no-nested-ternary": "error",
+    "prefer-const": "error",
+    "object-shorthand": "error",
+    "prefer-template": "error",
+
+    // Solid 2.0: two-argument effects, no removed 1.x APIs, props stay reactive.
+    "solid/removed-api": "error",
+    "solid/no-single-arg-create-effect": "error",
+    "solid/no-accessor-as-prop": "error",
+    "solid/no-destructure": "error",
+    "solid/reactivity": "error",
+    "solid/jsx-no-undef": "error",
+    "solid/prefer-structured-class": "warn",
+
+    // anti-slop: no widening a type you already know, and no asserting your
+    // way back out of it. An `unknown` in a signature is a missing type.
+    "anti-slop/no-chained-type-assertions": "error",
+    "anti-slop/no-conditional-empty-object-spread": "error",
+    "anti-slop/no-known-value-widening": "error",
+    "anti-slop/no-module-mocking": "error",
+    "anti-slop/no-object-parameters": "error",
+    "anti-slop/no-reflect-apply": "error",
+    "anti-slop/no-reflect-get": "error",
+    "anti-slop/no-runtime-typeof": "error",
+    "anti-slop/no-shape-in-symbol-names": "error",
+    "anti-slop/no-unknown-parameters": "error",
+    "anti-slop/no-unknown-returns": "error",
+    "anti-slop/no-unknown-type-aliases": "error",
+    "anti-slop/no-unsafe-dictionary-type": "error",
+    "anti-slop/no-widen-then-assert": "error",
+    "anti-slop/require-safety-comment-for-type-assertion": "error"
+  },
+  "overrides": [
+    {
+      // Cap source files at 300 lines. Split into focused modules past that.
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        "max-lines": ["error", { "max": 300, "skipBlankLines": true, "skipComments": true }]
+      }
+    }
+  ],
+  "env": { "builtin": true, "browser": true },
+  "ignorePatterns": [".claude", "dist", "node_modules", "corpus", "public", "*.lock", "tools"]
+}
