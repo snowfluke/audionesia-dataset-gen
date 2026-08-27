@@ -170,7 +170,9 @@ export default function RecordView(): JSX.Element {
             >
               Simpan
             </Button>
-            <Button onClick={() => void attempt(store.play)}>Putar</Button>
+            <Button onClick={() => void attempt(store.play)}>
+              {store.playState() === "playing" ? "Jeda" : "Putar"}
+            </Button>
           </Show>
           <Button
             variant="ghost"
@@ -183,7 +185,7 @@ export default function RecordView(): JSX.Element {
         </div>
         <p class="text-xs text-kumo-subtle">
           <Kbd>Spasi</Kbd> rekam / berhenti · <Kbd>Enter</Kbd> simpan · <Kbd>R</Kbd> rekam ulang ·{" "}
-          <Kbd>P</Kbd> putar · <Kbd>S</Kbd> lewati
+          <Kbd>P</Kbd> putar / jeda · <Kbd>S</Kbd> lewati
         </p>
       </LayerCard>
     </div>

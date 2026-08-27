@@ -2,7 +2,8 @@ import { createMemo, createSignal, onCleanup } from "solid-js";
 
 import { attempt, showToast } from "../../components/toast.tsx";
 import { isClipped, peakDbfs } from "../../lib/audio/level.ts";
-import type { Playback } from "../../lib/audio/playback.ts";
+import type { PlayState } from "../../lib/audio/player.ts";
+import { createPlayer } from "../../lib/audio/player.ts";
 import { playSamples } from "../../lib/audio/playback.ts";
 import { analyzeTake } from "../../lib/audio/trim-silence.ts";
 import { encodeWav } from "../../lib/audio/wav-encode.ts";
@@ -38,6 +39,7 @@ export type RecordStore = {
   level: () => Level;
   devices: () => InputDevice[];
   take: () => Take | null;
+  playState: () => PlayState;
   batchDone: () => number;
   /** Why the current take cannot be saved, or null. */
   saveBlocker: () => string | null;
@@ -48,6 +50,7 @@ export type RecordStore = {
   save: () => Promise<void>;
   retake: () => void;
   skip: () => Promise<void>;
+  /** Putar / Jeda for the take that is waiting to be saved. */
   play: () => Promise<void>;
   toggle: () => void;
 };
@@ -58,7 +61,7 @@ export function createRecordStore(): RecordStore {
   const [busy, setBusy] = createSignal<"review" | "saving" | null>(null);
   const [take, setTake] = createSignal<Take | null>(null);
   const [batchDone, setBatchDone] = createSignal(0);
-  let playback: Playback | null = null;
+  const player = createPlayer();
   let stopTimer: ReturnType<typeof setTimeout> | null = null;
 
   const capture = createCapture((reason) => {
@@ -139,7 +142,7 @@ export function createRecordStore(): RecordStore {
 
   function start(): void {
     if (phase() !== "ready") return;
-    playback?.stop();
+    player.stop();
     if (!capture.start()) return;
     stopTimer = setTimeout(() => {
       stop();
@@ -173,6 +176,7 @@ export function createRecordStore(): RecordStore {
       recordedAt: new Date().toISOString(),
     };
     await saveClip(taken.snrDb === null ? clip : { ...clip, snrDb: taken.snrDb }, wav);
+    player.stop();
     setTake(null);
     const size = settings().batchSize;
     const done = batchDone() + 1;
@@ -185,7 +189,7 @@ export function createRecordStore(): RecordStore {
 
   function retake(): void {
     if (phase() !== "review") return;
-    playback?.stop();
+    player.stop();
     setTake(null);
     setBusy(null);
   }
@@ -201,8 +205,7 @@ export function createRecordStore(): RecordStore {
   async function play(): Promise<void> {
     const taken = take();
     if (taken === null) return;
-    playback?.stop();
-    playback = await playSamples(taken.samples, taken.sampleRate);
+    await player.toggle(() => playSamples(taken.samples, taken.sampleRate));
   }
 
   function toggle(): void {
@@ -225,7 +228,7 @@ export function createRecordStore(): RecordStore {
   onCleanup(() => {
     unregister();
     if (stopTimer !== null) clearTimeout(stopTimer);
-    playback?.stop();
+    player.stop();
     void attempt(capture.close);
   });
 
@@ -237,6 +240,7 @@ export function createRecordStore(): RecordStore {
     level: capture.level,
     devices: capture.devices,
     take,
+    playState: player.state,
     batchDone,
     saveBlocker,
     arm,
