@@ -7,7 +7,7 @@ import type { BuilderEntry } from "../src/lib/corpus/script-builder.ts";
 import { buildScripts } from "../src/lib/corpus/script-builder.ts";
 import { poolIndexSchema, poolSentenceSchema } from "../src/lib/corpus/schema.ts";
 import { DEFAULT_SYLLABLES_PER_SECOND } from "../src/lib/duration.ts";
-import { TRAINER_PRESETS } from "../src/lib/settings.ts";
+import { DEFAULT_TRAINER_PRESET, TRAINER_PRESETS } from "../src/lib/settings.ts";
 
 const WIDTH = 1280;
 const HEIGHT = 640;
@@ -30,7 +30,7 @@ async function coverageCurve(): Promise<{ points: Point[]; diphones: number; hou
   }
   const isDiphone = index.units.map((label) => label.startsWith("d:"));
   const diphones = isDiphone.filter(Boolean).length;
-  const preset = TRAINER_PRESETS["pocket-tts"];
+  const preset = TRAINER_PRESETS[DEFAULT_TRAINER_PRESET];
   const result = buildScripts(entries, {
     unitCount: index.units.length,
     minSyllables: Math.round(preset.minSec * DEFAULT_SYLLABLES_PER_SECOND),
@@ -91,20 +91,20 @@ function chartSvg(points: Point[], diphones: number): string {
     <line x1="${x0}" x2="${x0 + plotWidth}" y1="${sy(0)}" y2="${sy(0)}" class="axis"/>
     <path d="${path}" class="line"/>
     ${marks}${xTicks}
-    <text x="${x0 + plotWidth / 2}" y="${y0 + plotHeight + 44}" class="tick" text-anchor="middle">naskah dibaca (10–30 s per naskah)</text>
+    <text x="${x0 + plotWidth / 2}" y="${y0 + plotHeight + 44}" class="tick" text-anchor="middle">naskah dibaca (${TRAINER_PRESETS[DEFAULT_TRAINER_PRESET].minSec}–${TRAINER_PRESETS[DEFAULT_TRAINER_PRESET].maxSec} s per naskah)</text>
     <text x="${x0}" y="14" class="tick">cakupan ${diphones} difon dalam kumpulan</text>
   </svg>`;
 }
 
 function page(points: Point[], diphones: number, hours: number, total: number): string {
   return `<!doctype html>
-<html lang="id"><head><meta charset="utf-8"><title>Audionesia banner</title>
+<html lang="id"><head><meta charset="utf-8"><title>Audionesia Dataset Generator banner</title>
 <style>
   :root { --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #8a8985; --series: #2a78d6; --series-fill: #cde2fb; --grid: #e6e5e1; }
   html, body { margin: 0; background: var(--surface); }
   body { width: ${WIDTH}px; height: ${HEIGHT}px; overflow: hidden; font-family: -apple-system, "Segoe UI", Inter, Helvetica, Arial, sans-serif; color: var(--ink); }
   .wrap { display: grid; grid-template-columns: 520px 1fr; gap: 40px; padding: 64px 60px 0 64px; height: 100%; box-sizing: border-box; }
-  h1 { font-size: 64px; font-weight: 600; letter-spacing: 0; margin: 0 0 12px; line-height: 1; }
+  h1 { font-size: 52px; font-weight: 600; letter-spacing: 0; margin: 0 0 14px; line-height: 1.05; }
   .tag { font-size: 22px; line-height: 1.35; color: var(--ink-2); margin: 0 0 28px; }
   .sample { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 17px; line-height: 1.7; color: var(--ink-2); }
   .sample b { color: var(--ink); font-weight: 600; }
@@ -123,7 +123,7 @@ function page(points: Point[], diphones: number, hours: number, total: number): 
 </style></head>
 <body><div class="wrap">
   <div>
-    <h1>Audionesia</h1>
+    <h1>Audionesia<br>Dataset Generator</h1>
     <p class="tag">Pembuat dataset suara untuk TTS bahasa Indonesia. Naskah seimbang fonem, rekam di peramban, ekspor untuk StyleTTS2 dan PocketTTS.</p>
     <div class="sample">Tak seorang pun boleh ditangkap.<br><b>taʔ səoraŋ pun boleh ditaŋkap.</b></div>
     <div class="stats">
