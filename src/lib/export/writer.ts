@@ -17,34 +17,80 @@ declare global {
   }
 }
 
+const AUDIO_DIR = "dataset/audio";
+
 export function canPickDirectory(): boolean {
   return window.showDirectoryPicker !== undefined;
+}
+
+export async function pickDirectory(
+  mode: "read" | "readwrite"
+): Promise<FileSystemDirectoryHandle> {
+  const picker = window.showDirectoryPicker;
+  if (picker === undefined) throw new Error("Peramban ini tidak mendukung pemilihan folder");
+  return picker({ mode });
 }
 
 function toBytes(content: Uint8Array<ArrayBuffer> | string): Uint8Array<ArrayBuffer> {
   return content instanceof Uint8Array ? content : new TextEncoder().encode(content);
 }
 
+async function directoryAt(
+  root: FileSystemDirectoryHandle,
+  parts: readonly string[],
+  create: boolean
+): Promise<FileSystemDirectoryHandle | null> {
+  let directory = root;
+  for (const part of parts) {
+    try {
+      directory = await directory.getDirectoryHandle(part, { create });
+    } catch {
+      return null;
+    }
+  }
+  return directory;
+}
+
+/**
+ * Removes WAV files under dataset/audio that this export did not write, so a
+ * clip deleted or rejected since the last export does not linger on disk.
+ */
+async function pruneAudio(
+  root: FileSystemDirectoryHandle,
+  written: ReadonlySet<string>
+): Promise<void> {
+  const audio = await directoryAt(root, AUDIO_DIR.split("/"), false);
+  if (audio === null) return;
+  for await (const [speaker, handle] of audio.entries()) {
+    if (handle.kind !== "directory") continue;
+    let remaining = 0;
+    for await (const name of handle.keys()) {
+      if (written.has(`${AUDIO_DIR}/${speaker}/${name}`)) remaining += 1;
+      else await handle.removeEntry(name);
+    }
+    if (remaining === 0) await audio.removeEntry(speaker);
+  }
+}
+
 /** Writes straight into a directory chosen with the File System Access API (Chromium). */
-export async function createFolderWriter(): Promise<DatasetWriter> {
-  const picker = window.showDirectoryPicker;
-  if (picker === undefined) throw new Error("Peramban ini tidak mendukung pemilihan folder");
-  const root = await picker({ mode: "readwrite" });
+export async function createFolderWriter(root?: FileSystemDirectoryHandle): Promise<DatasetWriter> {
+  const target = root ?? (await pickDirectory("readwrite"));
+  const written = new Set<string>();
   return {
     async file(path, content) {
       const parts = path.split("/");
       const name = parts.pop();
       if (name === undefined || name === "") throw new Error(`invalid path ${path}`);
-      let directory = root;
-      for (const part of parts)
-        directory = await directory.getDirectoryHandle(part, { create: true });
+      const directory = await directoryAt(target, parts, true);
+      if (directory === null) throw new Error(`cannot create ${path}`);
       const handle = await directory.getFileHandle(name, { create: true });
       const writable = await handle.createWritable();
       await writable.write(toBytes(content));
       await writable.close();
+      written.add(path);
     },
     async finish() {
-      // Files are already on disk.
+      await pruneAudio(target, written);
     },
   };
 }

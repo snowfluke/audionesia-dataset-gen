@@ -5,14 +5,16 @@ import {
   clipFileName,
   hfMetadataLine,
   oodLine,
+  partition,
   pocketTtsLine,
   relativeClipPath,
   speakersJsonlLine,
-  splitTrainVal,
+  splitFor,
   styleTts2Line,
 } from "../../src/lib/export/manifest.ts";
 
 const ROW: ExportRow = {
+  clipId: "3f1c2a2e-0000-4000-8000-000000000001",
   hash: "ba7816bf8f01cfea",
   path: "dataset/audio/budi/clip_0001.wav",
   relativePath: "audio/budi/clip_0001.wav",
@@ -22,6 +24,7 @@ const ROW: ExportRow = {
   durationSec: 3.2004,
   speakerId: "budi",
   speakerIndex: 0,
+  split: "train",
 };
 
 describe("manifest lines", () => {
@@ -42,7 +45,9 @@ describe("manifest lines", () => {
   });
 
   it("writes Hugging Face, StyleTTS2, OOD, and PocketTTS lines", () => {
-    expect(JSON.parse(hfMetadataLine(ROW)).file_name).toBe("audio/budi/clip_0001.wav");
+    const hf = JSON.parse(hfMetadataLine(ROW));
+    expect(hf.file_name).toBe("audio/budi/clip_0001.wav");
+    expect(hf.split).toBe("train");
     expect(styleTts2Line(ROW, "halo apa kabar.")).toBe(
       "audio/budi/clip_0001.wav|halo apa kabar.|0"
     );
@@ -56,16 +61,24 @@ describe("manifest lines", () => {
   });
 });
 
-describe("splitTrainVal", () => {
-  it("sends every 20th row to validation, deterministically", () => {
-    const rows = Array.from({ length: 45 }, (_, i) => i);
-    const split = splitTrainVal(rows);
-    expect(split.val).toEqual([19, 39]);
-    expect(split.train).toHaveLength(43);
+describe("splitFor", () => {
+  it("is deterministic per clip id", async () => {
+    expect(await splitFor(ROW.clipId)).toBe(await splitFor(ROW.clipId));
   });
 
-  it("keeps at least one validation row when there are two or more rows", () => {
-    expect(splitTrainVal([1, 2]).val).toEqual([2]);
-    expect(splitTrainVal([1]).val).toEqual([]);
+  it("sends roughly one clip in twenty to validation", async () => {
+    let validation = 0;
+    for (let i = 0; i < 2000; i += 1) {
+      if ((await splitFor(`clip-${i}`)) === "validation") validation += 1;
+    }
+    expect(validation).toBeGreaterThan(60);
+    expect(validation).toBeLessThan(140);
+  });
+
+  it("partitions rows by their split", () => {
+    const rows = [ROW, { ...ROW, clipId: "b", split: "validation" as const }];
+    const split = partition(rows);
+    expect(split.train).toHaveLength(1);
+    expect(split.val).toHaveLength(1);
   });
 });

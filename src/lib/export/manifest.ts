@@ -1,5 +1,10 @@
+import { sha256Hex } from "../hash.ts";
+
+export type Split = "train" | "validation";
+
 /** One exported clip, after resampling and hashing. */
 export type ExportRow = {
+  clipId: string;
   hash: string;
   /** `dataset/audio/<speaker>/clip_0001.wav`, as in speakers.jsonl. */
   path: string;
@@ -13,9 +18,12 @@ export type ExportRow = {
   speakerId: string;
   /** Integer id in speaker creation order, for StyleTTS2. */
   speakerIndex: number;
+  split: Split;
 };
 
 export const DATASET_ROOT = "dataset";
+/** One clip in this many goes to validation. */
+export const VALIDATION_EVERY = 20;
 
 export function clipFileName(seq: number): string {
   return `clip_${String(seq).padStart(4, "0")}.wav`;
@@ -28,6 +36,24 @@ export function relativeClipPath(speakerId: string, seq: number): string {
 function round(value: number, digits = 3): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
+}
+
+/**
+ * Train or validation, decided by a hash of the clip id, so a clip keeps its
+ * split across exports no matter which clips are added or removed around it.
+ */
+export async function splitFor(clipId: string, everyNth = VALIDATION_EVERY): Promise<Split> {
+  const hex = await sha256Hex(new TextEncoder().encode(clipId));
+  return Number.parseInt(hex.slice(0, 8), 16) % everyNth === 0 ? "validation" : "train";
+}
+
+export type TrainValSplit<T> = { train: T[]; val: T[] };
+
+export function partition<T extends { split: Split }>(rows: readonly T[]): TrainValSplit<T> {
+  return {
+    train: rows.filter((row) => row.split === "train"),
+    val: rows.filter((row) => row.split === "validation"),
+  };
 }
 
 /** The user's target line: `{"hash","path","text","phonemes","duration","speaker"}`. */
@@ -50,6 +76,7 @@ export function hfMetadataLine(row: ExportRow): string {
     phonemes: row.phonemes,
     speaker: row.speakerId,
     duration: round(row.durationSec),
+    split: row.split,
   });
 }
 
@@ -71,21 +98,4 @@ export function pocketTtsLine(row: ExportRow): string {
     transcript: row.transcript,
     phonemes: row.phonemes,
   });
-}
-
-export type TrainValSplit<T> = { train: T[]; val: T[] };
-
-/** Deterministic train/validation split: every `everyNth` row (1-based) goes to validation. */
-export function splitTrainVal<T>(rows: readonly T[], everyNth = 20): TrainValSplit<T> {
-  const train: T[] = [];
-  const val: T[] = [];
-  rows.forEach((row, index) => {
-    if ((index + 1) % everyNth === 0) val.push(row);
-    else train.push(row);
-  });
-  if (val.length === 0 && train.length > 1) {
-    const last = train.pop();
-    if (last !== undefined) val.push(last);
-  }
-  return { train, val };
 }
