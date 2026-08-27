@@ -63,17 +63,24 @@ function popHeap(heap: HeapItem[]): HeapItem | undefined {
 }
 
 /**
+ * Short fragments are charged at least this many syllables, so a script is
+ * not stitched from one-word exclamations that happen to carry a rare sound.
+ */
+const MIN_COST_SYLLABLES = 12;
+
+/**
  * Value of an entry given what the scripts so far already cover. Each unit is
- * worth its rarity in the pool (1 / pool frequency) divided by 1 + the times
- * it is already covered, and the sum is divided by the syllables it costs to
- * read. Rare sounds therefore surface early, which matters when recording
- * stops long before the pool is exhausted. The value only falls as coverage
- * grows, so lazy re-evaluation is exact.
+ * worth its rarity in the pool (1 / log2 of its pool frequency) divided by
+ * 1 + the times it is already covered, and the sum is divided by the
+ * syllables it costs to read. Rare sounds therefore surface early, which
+ * matters when recording stops long before the pool is exhausted, without a
+ * one-off foreign name outweighing everything else. The value only falls as
+ * coverage grows, so lazy re-evaluation is exact.
  */
 function scoreEntry(entry: BuilderEntry, weights: Float64Array, unitCounts: Uint32Array): number {
   let total = 0;
   for (const unit of entry.units) total += (weights[unit] ?? 0) / (1 + (unitCounts[unit] ?? 0));
-  return total / Math.max(1, entry.syllables);
+  return total / Math.max(MIN_COST_SYLLABLES, entry.syllables);
 }
 
 function rarityWeights(entries: readonly BuilderEntry[], unitCount: number): Float64Array {
@@ -81,7 +88,7 @@ function rarityWeights(entries: readonly BuilderEntry[], unitCount: number): Flo
   const weights = new Float64Array(unitCount);
   for (let unit = 0; unit < unitCount; unit += 1) {
     const count = frequency[unit] ?? 0;
-    weights[unit] = count === 0 ? 0 : 1 / count;
+    weights[unit] = count === 0 ? 0 : 1 / Math.log2(2 + count);
   }
   return weights;
 }

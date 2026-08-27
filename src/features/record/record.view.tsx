@@ -25,6 +25,13 @@ export default function RecordView(): JSX.Element {
   });
   const outsideWindow = (seconds: number): boolean =>
     seconds < settings().targetMinSec || seconds > settings().targetMaxSec;
+  const levelDetail = (): string => {
+    const peak = store.level().peak;
+    if (store.phase() === "idle" || store.phase() === "arming") return "Mikrofon belum aktif";
+    if (peak >= CLIP_PEAK) return "Terlalu keras";
+    if (peak === 0) return "Senyap";
+    return `${amplitudeToDbfs(peak).toFixed(0)} dBFS`;
+  };
 
   const recordLabel = (): string => {
     const phase = store.phase();
@@ -76,11 +83,7 @@ export default function RecordView(): JSX.Element {
         <Meter
           value={levelRatio()}
           label="Level mikrofon"
-          detail={
-            store.level().peak >= CLIP_PEAK
-              ? "Terlalu keras"
-              : `${amplitudeToDbfs(store.level().peak).toFixed(0)} dBFS`
-          }
+          detail={levelDetail()}
           tone={store.level().peak >= CLIP_PEAK ? "danger" : "default"}
         />
         <Show when={store.take()}>
