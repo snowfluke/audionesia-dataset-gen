@@ -20,6 +20,7 @@ function createVersion1(database: IDBPDatabase<AudionesiaDb>): void {
   database.createObjectStore("audio", { keyPath: "clipId" });
   database.createObjectStore("skips", { keyPath: ["speakerId", "scriptId"] });
   database.createObjectStore("settings", { keyPath: "key" });
+  database.createObjectStore("units", { keyPath: "id" });
 }
 
 /** The single shared connection. Each schema version adds one migration step here. */

@@ -61,6 +61,9 @@ export type SkipRow = { speakerId: string; scriptId: string; skippedAt: string }
 
 export type SettingsRow = { key: "app"; value: AppSettings };
 
+/** A coverage unit label and its id; ids match `units` arrays on sentences. */
+export type UnitRow = { id: number; label: string };
+
 /** Every store, key, and index of the database. Bump `DB_VERSION` when this changes. */
 export type AudionesiaDb = {
   speakers: { key: string; value: Speaker };
@@ -79,4 +82,5 @@ export type AudionesiaDb = {
   audio: { key: string; value: AudioRow };
   skips: { key: [string, string]; value: SkipRow };
   settings: { key: string; value: SettingsRow };
+  units: { key: number; value: UnitRow };
 };
