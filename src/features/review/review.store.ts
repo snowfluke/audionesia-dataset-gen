@@ -4,6 +4,7 @@ import { attempt, showToast } from "../../components/toast.tsx";
 import { checkClipWithAsr } from "../../lib/asr/check.ts";
 import type { PlayState } from "../../lib/audio/player.ts";
 import { createPlayer } from "../../lib/audio/player.ts";
+import type { Playback } from "../../lib/audio/playback.ts";
 import { playWav } from "../../lib/audio/playback.ts";
 import { decodeWav } from "../../lib/audio/wav-encode.ts";
 import {
@@ -75,19 +76,24 @@ export function createReviewStore(): ReviewStore {
     setSelectedId(clip.id);
   }
 
-  async function togglePlay(): Promise<void> {
-    const clip = current();
-    if (clip === undefined) return;
-    await player.toggle(async () => {
+  function startFor(clip: Clip): () => Promise<Playback> {
+    return async () => {
       const blob = await getClipAudio(clip.id);
       if (blob === undefined) throw new Error("Audio klip ini sudah dibebaskan");
       return playWav(blob);
-    });
+    };
   }
 
+  async function togglePlay(): Promise<void> {
+    const clip = current();
+    if (clip === undefined) return;
+    await player.toggle(startFor(clip));
+  }
+
+  // The selection write lands on the next flush, so play the row itself, not `current()`.
   async function playRow(clip: Clip): Promise<void> {
     select(clip);
-    await togglePlay();
+    await player.toggle(startFor(clip));
   }
 
   function advanceBatch(): void {
