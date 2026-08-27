@@ -15,7 +15,10 @@ export type TrimOptions = {
  * Removes leading and trailing silence, keeping `paddingMs` of it on each
  * side. Returns an empty array when nothing rises above the threshold.
  */
-export function trimSilence(samples: Float32Array, options: TrimOptions): Float32Array {
+export function trimSilence(
+  samples: Float32Array<ArrayBuffer>,
+  options: TrimOptions
+): Float32Array<ArrayBuffer> {
   const window = Math.max(1, Math.round((options.sampleRate * WINDOW_MS) / 1000));
   const threshold = dbfsToAmplitude(options.thresholdDbfs);
   const windows = Math.ceil(samples.length / window);

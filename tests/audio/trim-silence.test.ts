@@ -6,7 +6,7 @@ import { trimSilence } from "../../src/lib/audio/trim-silence.ts";
 const SAMPLE_RATE = 1000;
 const OPTIONS = { sampleRate: SAMPLE_RATE, thresholdDbfs: -40, paddingMs: 20 };
 
-function tone(lengthSamples: number, amplitude: number): Float32Array {
+function tone(lengthSamples: number, amplitude: number): Float32Array<ArrayBuffer> {
   const samples = new Float32Array(lengthSamples);
   for (let i = 0; i < lengthSamples; i += 1) samples[i] = amplitude * (i % 2 === 0 ? 1 : -1);
   return samples;

@@ -14,6 +14,7 @@ export const TRAINER_PRESETS = {
   styletts2: { label: "StyleTTS2 (5-15 s)", minSec: 5, maxSec: 15 },
 } as const;
 export type TrainerPreset = keyof typeof TRAINER_PRESETS;
+export const TRAINER_PRESET_IDS: readonly TrainerPreset[] = ["pocket-tts", "styletts2"];
 
 export const appSettingsSchema = z.object({
   syllablesPerSecond: z.number().positive().default(DEFAULT_SYLLABLES_PER_SECOND),
