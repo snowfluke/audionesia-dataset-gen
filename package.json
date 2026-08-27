@@ -3,6 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "description": "Static web app that builds an Indonesian TTS training dataset: phoneme-balanced scripts, in-browser recording, IndexedDB storage, StyleTTS2 and PocketTTS export.",
+  "license": "MIT",
+  "author": "snowfluke",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/snowfluke/audionesia-dataset-gen.git"
+  },
+  "homepage": "https://snowfluke.github.io/audionesia-dataset-gen/",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,6 +22,7 @@
     "fmt:fix": "oxfmt src tests scripts docs",
     "test": "bun test",
     "smoke": "bun scripts/smoke.ts",
+    "banner": "bun scripts/render-banner.ts",
     "complete-check": "bun run type-check && bun run lint && bun run fmt && bun test && bun run build",
     "corpus:common-voice": "bun scripts/corpus/fetch-common-voice.ts",
     "corpus:tatoeba": "bun scripts/corpus/fetch-tatoeba.ts",
