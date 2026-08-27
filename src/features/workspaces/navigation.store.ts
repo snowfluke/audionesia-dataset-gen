@@ -4,7 +4,6 @@ import { createSignal } from "solid-js";
 export const TABS = [
   { id: "record", label: "Rekam" },
   { id: "review", label: "Dengarkan" },
-  { id: "clips", label: "Klip" },
   { id: "write", label: "Teks sendiri" },
   { id: "dataset", label: "Dataset" },
   { id: "settings", label: "Pengaturan" },

@@ -32,8 +32,8 @@ export default function HelpDialogs(props: HelpDialogsProps): JSX.Element {
           </li>
           <li>Setujui klip di tab Dengarkan hanya jika setiap kata terucap sesuai naskah.</li>
           <li>
-            Teks sendiri yang ditambahkan menjadi naskah pertama di antrean Rekam. Tab Klip
-            menampilkan semua rekaman dataset.
+            Teks sendiri yang ditambahkan menjadi naskah pertama di antrean Rekam. Tab Dengarkan
+            memuat daftar semua rekaman: cari, buka halaman, dan pilih klip untuk ditinjau.
           </li>
           <li>
             Ekspor secara berkala dari tab Dataset dan cadangkan dari halaman depan. Peramban bisa
@@ -50,7 +50,7 @@ export default function HelpDialogs(props: HelpDialogsProps): JSX.Element {
           <dt>
             <Kbd>Spasi</Kbd>
           </dt>
-          <dd>Rekam / berhenti (Rekam), putar (Dengarkan)</dd>
+          <dd>Rekam / berhenti (Rekam), putar / jeda (Dengarkan)</dd>
           <dt>
             <Kbd>Enter</Kbd>
           </dt>
@@ -62,7 +62,7 @@ export default function HelpDialogs(props: HelpDialogsProps): JSX.Element {
           <dt>
             <Kbd>P</Kbd>
           </dt>
-          <dd>Putar rekaman terakhir</dd>
+          <dd>Putar / jeda rekaman terakhir</dd>
           <dt>
             <Kbd>S</Kbd>
           </dt>

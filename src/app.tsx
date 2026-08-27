@@ -8,7 +8,6 @@ import Banner from "./components/banner.tsx";
 import Button from "./components/button.tsx";
 import Tabs from "./components/tabs.tsx";
 import Toaster, { attempt } from "./components/toast.tsx";
-import ClipsView from "./features/clips/clips.view.tsx";
 import DatasetView from "./features/dataset/dataset.view.tsx";
 import { initLibrary, phase, progress } from "./features/library/library.store.ts";
 import RecordView from "./features/record/record.view.tsx";
@@ -123,9 +122,6 @@ export default function App(): JSX.Element {
               </Match>
               <Match when={tab() === "review"}>
                 <ReviewView />
-              </Match>
-              <Match when={tab() === "clips"}>
-                <ClipsView />
               </Match>
               <Match when={tab() === "write"}>
                 <WriteView />

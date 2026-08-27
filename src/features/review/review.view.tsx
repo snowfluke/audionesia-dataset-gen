@@ -2,49 +2,36 @@ import type { JSX } from "@solidjs/web";
 import { Loading, Show, createSignal } from "solid-js";
 
 import Badge from "../../components/badge.tsx";
-import Banner from "../../components/banner.tsx";
 import Button from "../../components/button.tsx";
 import Dialog from "../../components/dialog.tsx";
 import Kbd from "../../components/kbd.tsx";
 import LayerCard from "../../components/layer-card.tsx";
-import Tabs from "../../components/tabs.tsx";
 import { attempt } from "../../components/toast.tsx";
 import Waveform from "../../components/waveform.tsx";
-import { formatCount, formatSeconds } from "../../lib/format.ts";
+import { formatSeconds } from "../../lib/format.ts";
 import BatchDots from "../record/batch-dots.tsx";
 import { settings } from "../settings/settings.store.ts";
-import { REVIEW_FILTERS, createReviewStore } from "./review.store.ts";
+import ClipTable from "./clip-table.tsx";
+import { clipFileName } from "./review.list.ts";
+import { createReviewStore } from "./review.store.ts";
 
 export default function ReviewView(): JSX.Element {
   const store = createReviewStore();
   const [confirmDelete, setConfirmDelete] = createSignal(false);
-  const emptyCopy = (): string => {
-    if (store.filter() === "approved") return "Belum ada klip yang disetujui di dataset ini.";
-    if (store.filter() === "rejected") return "Belum ada klip yang ditolak di dataset ini.";
-    return "Tidak ada klip yang menunggu tinjauan di dataset ini.";
-  };
 
   return (
     <div class="flex flex-col gap-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <Tabs
-          items={REVIEW_FILTERS}
-          value={store.filter()}
-          onChange={store.setFilter}
-          label="Status klip"
-        />
-        <p class="text-base text-kumo-subtle">
-          <Kbd>Spasi</Kbd> putar · <Kbd>Y</Kbd> setujui · <Kbd>N</Kbd> tolak
-        </p>
-      </div>
+      <p class="text-base text-kumo-subtle">
+        <Kbd>Spasi</Kbd> putar / jeda · <Kbd>Y</Kbd> setujui · <Kbd>N</Kbd> tolak. Pilih klip lain
+        dari daftar di bawah.
+      </p>
       <Loading fallback={<p class="text-kumo-subtle">Memuat klip...</p>}>
-        <Show when={store.current()} fallback={<Banner>{emptyCopy()}</Banner>}>
+        <Show when={store.current()}>
           {(clip) => (
             <LayerCard class="flex flex-col gap-4">
               <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-kumo-subtle">
                 <span>
-                  clip_{String(clip().seq).padStart(4, "0")} · {formatSeconds(clip().durationSec)} ·{" "}
-                  {formatCount(store.clips().length)} klip di daftar ini
+                  {clipFileName(clip())} · {formatSeconds(clip().durationSec)}
                 </span>
                 <div class="flex gap-2">
                   <Badge variant={clip().clipped ? "error" : "secondary"}>
@@ -77,13 +64,8 @@ export default function ReviewView(): JSX.Element {
                 <Waveform samples={store.waveform()} label="Bentuk gelombang klip" />
               </Loading>
               <div class="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={() => void attempt(store.play)}
-                  disabled={store.playing()}
-                >
-                  {store.playing() ? "Memutar..." : "Putar"}
+                <Button variant="primary" size="lg" onClick={() => void attempt(store.togglePlay)}>
+                  {store.playState() === "playing" ? "Jeda" : "Putar"}
                 </Button>
                 <Show when={clip().status !== "approved"}>
                   <Button
@@ -123,6 +105,7 @@ export default function ReviewView(): JSX.Element {
             </LayerCard>
           )}
         </Show>
+        <ClipTable store={store} />
       </Loading>
       <Dialog
         open={confirmDelete()}

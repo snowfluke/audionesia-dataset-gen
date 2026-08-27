@@ -108,8 +108,8 @@ export default function ExportPanel(props: ExportPanelProps): JSX.Element {
         <p class="text-base text-kumo-subtle">
           Whisper ({settings().asrModel.replace("onnx-community/", "")}) berjalan di peramban dan
           menulis ulang setiap klip yang menunggu; klip yang berbeda lebih dari{" "}
-          {Math.round(settings().asrCerWarn * 100)}% dari naskahnya diberi tanda di tab Dengarkan
-          dan Klip. Model diunduh sekali dan disimpan peramban.
+          {Math.round(settings().asrCerWarn * 100)}% dari naskahnya diberi tanda di tab Dengarkan.
+          Model diunduh sekali dan disimpan peramban.
         </p>
         <Button
           disabled={busy()}

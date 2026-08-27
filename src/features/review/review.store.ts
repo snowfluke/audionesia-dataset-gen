@@ -2,13 +2,14 @@ import { createMemo, createSignal, onCleanup } from "solid-js";
 
 import { attempt, showToast } from "../../components/toast.tsx";
 import { checkClipWithAsr } from "../../lib/asr/check.ts";
-import type { Playback } from "../../lib/audio/playback.ts";
+import type { PlayState } from "../../lib/audio/player.ts";
+import { createPlayer } from "../../lib/audio/player.ts";
 import { playWav } from "../../lib/audio/playback.ts";
 import { decodeWav } from "../../lib/audio/wav-encode.ts";
 import {
   deleteClip,
   getClipAudio,
-  listClipsByWorkspaceStatus,
+  listClipsByWorkspace,
   setClipStatus,
 } from "../../lib/db/clip.repository.ts";
 import type { Clip, ClipStatus } from "../../lib/db/schema.ts";
@@ -16,50 +17,50 @@ import { registerShortcuts } from "../../lib/shortcuts.ts";
 import { bumpClips, clipsVersion } from "../library/library.store.ts";
 import { settings } from "../settings/settings.store.ts";
 import { currentWorkspace } from "../workspaces/workspaces.store.ts";
-
-export const REVIEW_FILTERS: readonly { id: ClipStatus; label: string }[] = [
-  { id: "pending", label: "Menunggu" },
-  { id: "approved", label: "Disetujui" },
-  { id: "rejected", label: "Ditolak" },
-];
+import type { ClipList } from "./review.list.ts";
+import { createClipList } from "./review.list.ts";
 
 export type ReviewStore = {
-  /** Model download or transcription in flight; text describes the step. */
-  asrProgress: () => string | null;
-  checkAsr: () => Promise<void>;
-  filter: () => ClipStatus;
-  setFilter: (status: ClipStatus) => void;
-  clips: () => Clip[];
+  list: ClipList;
+  /** The selected clip, or the first clip on the current page. */
   current: () => Clip | undefined;
+  select: (clip: Clip) => void;
   /** Decoded samples of the current clip for the waveform; null while loading or absent. */
   waveform: () => Float32Array | null;
-  playing: () => boolean;
+  playState: () => PlayState;
+  /** Putar / Jeda for the current clip. */
+  togglePlay: () => Promise<void>;
+  /** Selects a row and plays or pauses it. */
+  playRow: (clip: Clip) => Promise<void>;
   batchDone: () => number;
-  play: () => Promise<void>;
   decide: (status: ClipStatus) => Promise<void>;
   /** Marks the clip rejected so its script returns to the Rekam queue. */
   requeue: () => Promise<void>;
   remove: () => Promise<void>;
+  /** Model download or transcription in flight; text describes the step. */
+  asrProgress: () => string | null;
+  checkAsr: () => Promise<void>;
 };
 
-/** Call inside the Dengarkan view. Lists the open workspace's clips by status, oldest first. */
+/** Call inside the Dengarkan view. Lists the open workspace's clips in recording order. */
 export function createReviewStore(): ReviewStore {
-  const [filter, setFilter] = createSignal<ClipStatus>("pending");
+  const [selectedId, setSelectedId] = createSignal<string | null>(null);
   const [batchDone, setBatchDone] = createSignal(0);
-  const [playing, setPlaying] = createSignal(false);
   const [asrProgress, setAsrProgress] = createSignal<string | null>(null);
-  let playback: Playback | null = null;
+  const player = createPlayer();
 
-  const clips = createMemo(async (): Promise<Clip[]> => {
+  const all = createMemo(async (): Promise<Clip[]> => {
     clipsVersion();
     const workspace = currentWorkspace();
     if (workspace === null) return [];
-    const rows = await listClipsByWorkspaceStatus(workspace.id, filter());
+    const rows = await listClipsByWorkspace(workspace.id);
     rows.sort((a, b) => a.seq - b.seq);
     return rows;
   });
+  const list = createClipList(all);
 
-  const current = (): Clip | undefined => clips()[0];
+  const current = (): Clip | undefined =>
+    list.rows().find((clip) => clip.id === selectedId()) ?? list.visible()[0];
 
   const waveform = createMemo(async (): Promise<Float32Array | null> => {
     const clip = current();
@@ -69,16 +70,24 @@ export function createReviewStore(): ReviewStore {
     return decodeWav(new Uint8Array(await blob.arrayBuffer())).samples;
   });
 
-  async function play(): Promise<void> {
+  function select(clip: Clip): void {
+    if (current()?.id !== clip.id) player.stop();
+    setSelectedId(clip.id);
+  }
+
+  async function togglePlay(): Promise<void> {
     const clip = current();
     if (clip === undefined) return;
-    playback?.stop();
-    const blob = await getClipAudio(clip.id);
-    if (blob === undefined) throw new Error("Audio klip tidak ditemukan");
-    setPlaying(true);
-    playback = await playWav(blob);
-    await playback.finished;
-    setPlaying(false);
+    await player.toggle(async () => {
+      const blob = await getClipAudio(clip.id);
+      if (blob === undefined) throw new Error("Audio klip ini sudah dibebaskan");
+      return playWav(blob);
+    });
+  }
+
+  async function playRow(clip: Clip): Promise<void> {
+    select(clip);
+    await togglePlay();
   }
 
   function advanceBatch(): void {
@@ -91,8 +100,7 @@ export function createReviewStore(): ReviewStore {
   async function decide(status: ClipStatus): Promise<void> {
     const clip = current();
     if (clip === undefined || clip.status === status) return;
-    playback?.stop();
-    setPlaying(false);
+    player.stop();
     await setClipStatus(clip.id, status);
     advanceBatch();
     bumpClips();
@@ -105,8 +113,7 @@ export function createReviewStore(): ReviewStore {
   async function requeue(): Promise<void> {
     const clip = current();
     if (clip === undefined) return;
-    playback?.stop();
-    setPlaying(false);
+    player.stop();
     await setClipStatus(clip.id, "rejected");
     bumpClips();
     showToast("Naskah kembali ke antrean Rekam", "info");
@@ -115,7 +122,7 @@ export function createReviewStore(): ReviewStore {
   async function remove(): Promise<void> {
     const clip = current();
     if (clip === undefined) return;
-    playback?.stop();
+    player.stop();
     await deleteClip(clip.id);
     bumpClips();
     showToast("Klip dihapus");
@@ -145,7 +152,7 @@ export function createReviewStore(): ReviewStore {
   // oxlint-disable solid/reactivity -- keydown handlers run outside Solid tracking on purpose
   const unregister = registerShortcuts(
     new Map([
-      [" ", () => void attempt(play)],
+      [" ", () => void attempt(togglePlay)],
       ["y", () => void attempt(() => decide("approved"))],
       ["n", () => void attempt(() => decide("rejected"))],
     ])
@@ -153,22 +160,22 @@ export function createReviewStore(): ReviewStore {
   // oxlint-enable solid/reactivity
   onCleanup(() => {
     unregister();
-    playback?.stop();
+    player.stop();
   });
 
   return {
-    asrProgress,
-    checkAsr,
-    filter,
-    setFilter,
-    clips,
+    list,
     current,
+    select,
     waveform,
-    playing,
+    playState: player.state,
+    togglePlay,
+    playRow,
     batchDone,
-    play,
     decide,
     requeue,
     remove,
+    asrProgress,
+    checkAsr,
   };
 }
