@@ -335,7 +335,7 @@ All code identifiers are English. UI labels are Bahasa Indonesia string literals
 
 ## 10. Localization and User-Facing Copy
 
-- UI strings are Bahasa Indonesia. The home page lists datasets; tab names inside one: `Rekam`, `Dengarkan`, `Klip`, `Teks sendiri`, `Dataset`, `Pengaturan`.
+- UI strings are Bahasa Indonesia. The home page lists datasets; tab names inside one: `Rekam`, `Dengarkan`, `Teks sendiri`, `Dataset`, `Pengaturan`.
 - No i18n library. Copy lives in the view that uses it.
 - Numbers use the `id-ID` locale (`1.234,5`). Durations show one decimal and the unit: `12,3 s`.
 - Dataset files, manifests, field names, and log messages are English.

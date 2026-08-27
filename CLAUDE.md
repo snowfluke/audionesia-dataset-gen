@@ -110,7 +110,7 @@ audionesia-dataset-gen/
     main.tsx  app.tsx              # mount; header, speaker picker, tabs, help dialogs
     components/                    # one Solid component per file, Kumo class strings
     features/
-      record/   review/   clips/   # Rekam, Dengarkan, Klip: <feature>.store.ts + .view.tsx
+      record/   review/            # Rekam, Dengarkan (review card + clip-table with search and pages)
       write/                       # Teks sendiri: own text, sample files, scripts first in the queue
       dataset/  settings/          # Dataset (stats, export), Pengaturan (knobs)
       workspaces/ library/         # home page, workspace + tab stores; pool seeding, script build
@@ -139,7 +139,7 @@ audionesia-dataset-gen/
 
 **Home:** the list of workspaces (`features/workspaces/home.view.tsx`). A workspace is one dataset: a name, one speaker with consent, `targetHours`, and the `clip_XXXX` counter. `+ Dataset baru` creates one; backup and restore of every workspace live here.
 
-**Tabs inside a workspace (Bahasa Indonesia):** `Rekam` (record), `Dengarkan` (review), `Klip` (clip list), `Teks sendiri` (add text), `Dataset` (stats, export), `Pengaturan` (settings). The tab signal lives in `navigation.store.ts`; `openWorkspace` resets it to `Rekam`.
+**Tabs inside a workspace (Bahasa Indonesia):** `Rekam` (record), `Dengarkan` (review card plus the searchable, paged list of every clip), `Teks sendiri` (add text), `Dataset` (stats, export), `Pengaturan` (settings). The tab signal lives in `navigation.store.ts`; `openWorkspace` resets it to `Rekam`.
 
 **Clip status machine** (`src/lib/db/schema.ts`):
 
@@ -175,7 +175,7 @@ components  <-  features/*.view.tsx  ->  features/*.store.ts  ->  lib/*  ->  wor
 
 - Views hold JSX and view-local state. No IndexedDB, audio API, `fetch`, or `postMessage` in a view.
 - Feature stores own state and actions. Global stores (`workspaces`, `navigation`, `settings`, `library`) are module-level signals; per-tab stores are `create<Feature>Store()` factories called in the view so `createMemo` and `onCleanup` have an owner.
-- `lib/audio` (except `resample.ts`, `playback.ts`), `lib/corpus` (except `pool-loader.ts`), `lib/export/manifest.ts`, `lib/export/styletts2-symbols.ts`, `lib/duration.ts`, `lib/hash.ts`, `lib/slug.ts` are pure and tested with `bun test`. Keep DOM out of them.
+- `lib/audio` (except `resample.ts`, `playback.ts`, `player.ts`), `lib/corpus` (except `pool-loader.ts`), `lib/export/manifest.ts`, `lib/export/styletts2-symbols.ts`, `lib/duration.ts`, `lib/hash.ts`, `lib/slug.ts` are pure and tested with `bun test`. Keep DOM out of them.
 - Workers import from `lib/` only. One typed message contract per worker; the main thread goes through `callWorker` in `lib/worker-rpc.ts`.
 - `components/` never imports from `features/`.
 
@@ -271,7 +271,8 @@ Identifiers English. UI copy Bahasa Indonesia, in view files. Thrown `Error` mes
 - Export is per workspace (`exportDataset({ workspaceId })`): one speaker folder, its own `speakers.jsonl`; the folder writer prunes only `dataset/audio/<speaker>`.
 - Scripts made only of `user` sentences sort first in `rebuildScripts`, so Teks sendiri text is recorded before the pool.
 - Coverage units are `p:<phone>`, `d:<a>.<b>` (with `#` boundary), `f:<phenomenon>`; ids index the `units` store and `index.json`.
-- Duration window and syllable rate are settings with presets (`pocket-tts` 10-30 s, `styletts2` 5-15 s). Default `syllablesPerSecond` 4.5 is a calibration knob, fitted from approved clips.
+- Duration window and syllable rate are settings with presets (`styletts2` 5-15 s, the default; `pocket-tts` 10-30 s). `matchingPreset` derives the selected preset from the window. Default `syllablesPerSecond` 4.5 is a calibration knob, fitted from approved clips.
+- Audio playback goes through `createPlayer()` (`lib/audio/player.ts`): one `Putar` / `Jeda` state per store, pause and resume at the same position, a stale playback never resets the state.
 
 ## Testing
 
@@ -312,7 +313,7 @@ Identifiers English. UI copy Bahasa Indonesia, in view files. Thrown `Error` mes
 If context was compacted, re-verify:
 
 - [ ] Solid **2.0 RC** (`2.0.0-rc.3`), `jsxImportSource: "@solidjs/web"`, two-argument `createEffect`, async `createMemo` + `<Loading>`/`<Errored>`.
-- [ ] No router. Home lists workspaces; six tabs inside one: Rekam, Dengarkan, Klip, Teks sendiri, Dataset, Pengaturan.
+- [ ] No router. Home lists workspaces; five tabs inside one: Rekam, Dengarkan, Teks sendiri, Dataset, Pengaturan.
 - [ ] Raw PCM via AudioWorklet; `getUserMedia` constraints off; master WAV at capture rate; export at `exportSampleRate`.
 - [ ] `hash` from exported bytes, 16 hex; `path` `dataset/audio/<speaker>/clip_0001.wav`; `speakers.jsonl` shape fixed.
 - [ ] Only `approved` clips export; StyleTTS2 needs 2 clips per speaker and lines under 500 chars; PocketTTS max 30 s.
@@ -322,7 +323,7 @@ If context was compacted, re-verify:
 - [ ] Train/validation split hashes the clip id; workspaces order by `createdAt`; rebuilds keep referenced scripts and put user-text scripts first; scripts are single-source.
 - [ ] Backup (version 2) = workspaces, clips + master WAVs, skips, settings, Teks sendiri sentences (`lib/backup`); restore merges, never overwrites.
 - [ ] ASR check = Whisper in `asr.worker.ts`, 16 kHz input, CER via `lib/text/cer.ts`, results on `clip.asrCer` / `clip.asrText`.
-- [ ] Settings presets: `pocket-tts` 10-30 s (default), `styletts2` 5-15 s; syllable rate 4.5 default, fitted per speaker.
+- [ ] Settings presets: `styletts2` 5-15 s (default), `pocket-tts` 10-30 s; syllable rate 4.5 default, fitted per speaker.
 - [ ] Kumo look, hand-rolled Solid components; `data-mode` dark mode; 14 px body text, sentence-case headings, `font-semibold`.
 - [ ] UI Bahasa Indonesia; identifiers, dataset fields, and logs English.
 - [ ] Gate: `bun run complete-check`; browser: `bun run smoke` with `bun run dev` up.
