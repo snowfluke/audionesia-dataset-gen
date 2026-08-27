@@ -5,9 +5,11 @@ import { merge, omit } from "solid-js";
 const BASE =
   "inline-flex cursor-pointer items-center justify-center font-medium whitespace-nowrap select-none outline-none focus-visible:ring-2 focus-visible:ring-kumo-focus disabled:cursor-not-allowed";
 
+// Kumo's React Button sets --kumo-button-emphasis-bg inline; here the emphasis
+// colours are the contrast and danger tokens directly.
 const VARIANTS = {
   primary:
-    "relative overflow-hidden bg-(--kumo-button-emphasis-bg) !text-white ring ring-(--kumo-button-emphasis-ring) disabled:opacity-50",
+    "bg-kumo-contrast text-kumo-base ring ring-kumo-contrast not-disabled:hover:opacity-90 disabled:opacity-50",
   secondary:
     "bg-kumo-base !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:bg-kumo-base/50 disabled:!text-kumo-default/70 ring-kumo-line",
   ghost: "text-kumo-default hover:bg-kumo-tint shadow-none bg-inherit",
