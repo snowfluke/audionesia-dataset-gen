@@ -2,7 +2,7 @@ import type { CorpusSource, PoolSentence } from "../corpus/schema.ts";
 import type { AppSettings } from "../settings.ts";
 
 export const DB_NAME = "audionesia";
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export const CLIP_STATUSES = ["pending", "approved", "rejected"] as const;
 export type ClipStatus = (typeof CLIP_STATUSES)[number];
@@ -13,8 +13,8 @@ export type SpeakerGender = (typeof SPEAKER_GENDERS)[number];
 export const AGE_RANGES = ["under-18", "18-29", "30-44", "45-59", "60-plus"] as const;
 export type AgeRange = (typeof AGE_RANGES)[number];
 
+/** The person recorded in a workspace. `id` is the folder name under `dataset/audio/`. */
 export type Speaker = {
-  /** Slug of the name; also the folder name under `dataset/audio/`. */
   id: string;
   name: string;
   gender?: SpeakerGender;
@@ -26,7 +26,16 @@ export type Speaker = {
   /** When the speaker agreed to the dataset use of their voice. */
   consentAt?: string;
   notes?: string;
-  /** Next `clip_XXXX` sequence number for this speaker. */
+};
+
+/** One dataset in progress: a name, one speaker, a target, and a clip counter. */
+export type Workspace = {
+  /** Slug of the dataset name. */
+  id: string;
+  name: string;
+  speaker: Speaker;
+  targetHours: number;
+  /** Next `clip_XXXX` sequence number in this workspace. */
   nextSeq: number;
   createdAt: string;
 };
@@ -40,13 +49,15 @@ export type ScriptRow = {
   syllables: number;
   estSeconds: number;
   g2pVersion: string;
-  /** Reading order; scripts with the most coverage gain come first. */
+  /** Reading order; scripts from the user's own text come first, then the most coverage gain. */
   order: number;
   createdAt: string;
 };
 
 export type Clip = {
   id: string;
+  workspaceId: string;
+  /** The speaker folder the clip exports into; copied from the workspace at record time. */
   speakerId: string;
   scriptId: string;
   seq: number;
@@ -72,7 +83,7 @@ export type Clip = {
 
 export type AudioRow = { clipId: string; blob: Blob };
 
-export type SkipRow = { speakerId: string; scriptId: string; skippedAt: string };
+export type SkipRow = { workspaceId: string; scriptId: string; skippedAt: string };
 
 /** What the last successful seed loaded, so a changed pool is detected. */
 export type LibraryMeta = { poolCount: number; g2pVersion: string; seededAt: string };
@@ -86,16 +97,16 @@ export type UnitRow = { id: number; label: string };
 
 /** Every store, key, and index of the database. Bump `DB_VERSION` when this changes. */
 export type AudionesiaDb = {
-  speakers: { key: string; value: Speaker };
+  workspaces: { key: string; value: Workspace };
   sentences: { key: string; value: PoolSentence; indexes: { "by-source": CorpusSource } };
   scripts: { key: string; value: ScriptRow; indexes: { "by-order": number } };
   clips: {
     key: string;
     value: Clip;
     indexes: {
-      "by-speaker": string;
+      "by-workspace": string;
       "by-status": ClipStatus;
-      "by-speaker-status": [string, ClipStatus];
+      "by-workspace-status": [string, ClipStatus];
       "by-script": string;
     };
   };
