@@ -22,3 +22,6 @@ coverage
 # editors and OS
 .idea
 .DS_Store
+
+# browser smoke test output
+.smoke
