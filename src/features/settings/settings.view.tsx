@@ -13,7 +13,12 @@ import type { DurationSample } from "../../lib/duration.ts";
 import { MIN_CALIBRATION_CLIPS, fitSyllablesPerSecond } from "../../lib/duration.ts";
 import { ASR_MODELS } from "../../lib/asr/messages.ts";
 import type { AppSettings, TrainerPreset } from "../../lib/settings.ts";
-import { EXPORT_SAMPLE_RATES, TRAINER_PRESETS, TRAINER_PRESET_IDS } from "../../lib/settings.ts";
+import {
+  EXPORT_SAMPLE_RATES,
+  TRAINER_PRESETS,
+  TRAINER_PRESET_IDS,
+  matchingPreset,
+} from "../../lib/settings.ts";
 import { rebuildScripts } from "../library/library.store.ts";
 import { currentWorkspace } from "../workspaces/workspaces.store.ts";
 import { settings, updateSettings } from "./settings.store.ts";
@@ -67,10 +72,11 @@ const RATE_OPTIONS = EXPORT_SAMPLE_RATES.map((rate) => ({
   value: String(rate),
   label: `${rate} Hz`,
 }));
-const PRESET_OPTIONS = TRAINER_PRESET_IDS.map((preset) => ({
-  value: preset,
-  label: TRAINER_PRESETS[preset].label,
-}));
+const CUSTOM_PRESET = "custom";
+const PRESET_OPTIONS: { value: TrainerPreset | typeof CUSTOM_PRESET; label: string }[] = [
+  ...TRAINER_PRESET_IDS.map((preset) => ({ value: preset, label: TRAINER_PRESETS[preset].label })),
+  { value: CUSTOM_PRESET, label: "Kustom (jendela diubah sendiri)" },
+];
 
 function NumberFields(props: { fields: readonly NumberField[] }): JSX.Element {
   return (
@@ -97,7 +103,8 @@ function NumberFields(props: { fields: readonly NumberField[] }): JSX.Element {
 }
 
 export default function SettingsView(): JSX.Element {
-  const [preset, setPreset] = createSignal<TrainerPreset>("pocket-tts");
+  const preset = (): TrainerPreset | typeof CUSTOM_PRESET =>
+    matchingPreset(settings()) ?? CUSTOM_PRESET;
   const [fitted, setFitted] = createSignal<number | null>(null);
 
   async function calibrate(): Promise<void> {
@@ -130,7 +137,7 @@ export default function SettingsView(): JSX.Element {
             options={PRESET_OPTIONS}
             value={preset()}
             onChange={(value) => {
-              setPreset(value);
+              if (value === CUSTOM_PRESET) return;
               const chosen = TRAINER_PRESETS[value];
               void attempt(() =>
                 updateSettings({

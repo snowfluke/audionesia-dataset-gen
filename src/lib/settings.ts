@@ -11,11 +11,12 @@ export const EXPORT_SAMPLE_RATES = [16000, 22050, 24000, 44100, 48000] as const;
  * strings over 512 tokens; PocketTTS accepts up to 30 s per file.
  */
 export const TRAINER_PRESETS = {
-  "pocket-tts": { label: "PocketTTS (10-30 s)", minSec: 10, maxSec: 30, targetHours: 100 },
   styletts2: { label: "StyleTTS2 (5-15 s)", minSec: 5, maxSec: 15, targetHours: 5 },
+  "pocket-tts": { label: "PocketTTS (10-30 s)", minSec: 10, maxSec: 30, targetHours: 100 },
 } as const;
 export type TrainerPreset = keyof typeof TRAINER_PRESETS;
-export const TRAINER_PRESET_IDS: readonly TrainerPreset[] = ["pocket-tts", "styletts2"];
+export const TRAINER_PRESET_IDS: readonly TrainerPreset[] = ["styletts2", "pocket-tts"];
+export const DEFAULT_TRAINER_PRESET: TrainerPreset = "styletts2";
 
 export const LICENSE_MODES = ["all", "cc0"] as const;
 export type LicenseMode = (typeof LICENSE_MODES)[number];
@@ -23,10 +24,10 @@ export type LicenseMode = (typeof LICENSE_MODES)[number];
 export const appSettingsSchema = z
   .object({
     syllablesPerSecond: z.number().positive().default(DEFAULT_SYLLABLES_PER_SECOND),
-    targetMinSec: z.number().positive().default(TRAINER_PRESETS["pocket-tts"].minSec),
-    targetMaxSec: z.number().positive().default(TRAINER_PRESETS["pocket-tts"].maxSec),
+    targetMinSec: z.number().positive().default(TRAINER_PRESETS[DEFAULT_TRAINER_PRESET].minSec),
+    targetMaxSec: z.number().positive().default(TRAINER_PRESETS[DEFAULT_TRAINER_PRESET].maxSec),
     /** Recording hours the current effort aims for; drives the progress meter. */
-    targetHours: z.number().positive().default(TRAINER_PRESETS["pocket-tts"].targetHours),
+    targetHours: z.number().positive().default(TRAINER_PRESETS[DEFAULT_TRAINER_PRESET].targetHours),
     silenceThresholdDbfs: z.number().max(0).default(-45),
     silencePaddingMs: z.number().nonnegative().default(150),
     exportSampleRate: z.literal(EXPORT_SAMPLE_RATES).default(24000),
@@ -58,6 +59,17 @@ export const appSettingsSchema = z
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 
 export const DEFAULT_SETTINGS: AppSettings = appSettingsSchema.parse({});
+
+/** The preset whose window matches these settings, or null for a custom window. */
+export function matchingPreset(settings: AppSettings): TrainerPreset | null {
+  return (
+    TRAINER_PRESET_IDS.find(
+      (id) =>
+        TRAINER_PRESETS[id].minSec === settings.targetMinSec &&
+        TRAINER_PRESETS[id].maxSec === settings.targetMaxSec
+    ) ?? null
+  );
+}
 
 /** Sources whose text is public domain or generated, safe for a CC0-only dataset. */
 export const CC0_SOURCES: ReadonlySet<string> = new Set(["common-voice", "llm"]);
