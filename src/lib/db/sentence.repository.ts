@@ -11,10 +11,21 @@ export async function listSentences(): Promise<PoolSentence[]> {
   return (await db()).getAll("sentences");
 }
 
+export async function listSentencesBySource(source: CorpusSource): Promise<PoolSentence[]> {
+  return (await db()).getAllFromIndex("sentences", "by-source", source);
+}
+
 export async function getSentences(ids: readonly string[]): Promise<PoolSentence[]> {
   const tx = (await db()).transaction("sentences");
   const rows = await Promise.all(ids.map((id) => tx.store.get(id)));
   return rows.filter((row): row is PoolSentence => row !== undefined);
+}
+
+/** Which of the given ids already exist. */
+export async function existingSentenceIds(ids: readonly string[]): Promise<Set<string>> {
+  const tx = (await db()).transaction("sentences");
+  const keys = await Promise.all(ids.map((id) => tx.store.getKey(id)));
+  return new Set(keys.filter((key): key is string => key !== undefined));
 }
 
 /** Inserts or replaces rows in batches, each batch in its own transaction. */
@@ -25,6 +36,10 @@ export async function putSentences(rows: readonly PoolSentence[]): Promise<void>
     for (const row of rows.slice(start, start + PUT_BATCH)) void tx.store.put(row);
     await tx.done;
   }
+}
+
+export async function clearSentences(): Promise<void> {
+  await (await db()).clear("sentences");
 }
 
 export async function deleteSentencesBySource(source: CorpusSource): Promise<number> {

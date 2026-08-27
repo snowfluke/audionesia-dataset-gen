@@ -20,10 +20,14 @@ export async function putScripts(rows: readonly ScriptRow[]): Promise<void> {
   await tx.done;
 }
 
-export async function deleteScript(id: string): Promise<void> {
-  await (await db()).delete("scripts", id);
+/** Replaces the whole store with `rows` in one transaction. */
+export async function replaceScripts(rows: readonly ScriptRow[]): Promise<void> {
+  const tx = (await db()).transaction("scripts", "readwrite");
+  await tx.store.clear();
+  for (const row of rows) void tx.store.put(row);
+  await tx.done;
 }
 
-export async function clearScripts(): Promise<void> {
-  await (await db()).clear("scripts");
+export async function deleteScript(id: string): Promise<void> {
+  await (await db()).delete("scripts", id);
 }

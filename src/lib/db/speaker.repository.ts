@@ -1,8 +1,11 @@
 import { db } from "./database.ts";
 import type { Speaker } from "./schema.ts";
 
+/** Every speaker in creation order, which is also their StyleTTS2 `speaker_id` order. */
 export async function listSpeakers(): Promise<Speaker[]> {
-  return (await db()).getAll("speakers");
+  const speakers = await (await db()).getAll("speakers");
+  speakers.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  return speakers;
 }
 
 export async function getSpeaker(id: string): Promise<Speaker | undefined> {
@@ -11,6 +14,18 @@ export async function getSpeaker(id: string): Promise<Speaker | undefined> {
 
 export async function putSpeaker(speaker: Speaker): Promise<void> {
   await (await db()).put("speakers", speaker);
+}
+
+/** Inserts the speaker unless the id exists, in one transaction. Returns false when it existed. */
+export async function createSpeakerIfAbsent(speaker: Speaker): Promise<boolean> {
+  const tx = (await db()).transaction("speakers", "readwrite");
+  const existing = await tx.store.get(speaker.id);
+  if (existing !== undefined) {
+    await tx.done;
+    return false;
+  }
+  await Promise.all([tx.store.add(speaker), tx.done]);
+  return true;
 }
 
 /** Removes the speaker with every clip, audio blob, and skip that belongs to them. */

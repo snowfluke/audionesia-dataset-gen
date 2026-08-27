@@ -12,3 +12,7 @@ export async function putUnitLabels(labels: readonly string[], fromId = 0): Prom
   labels.forEach((label, offset) => void tx.store.put({ id: fromId + offset, label }));
   await tx.done;
 }
+
+export async function clearUnitLabels(): Promise<void> {
+  await (await db()).clear("units");
+}

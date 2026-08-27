@@ -10,11 +10,21 @@ export type ClipStatus = (typeof CLIP_STATUSES)[number];
 export const SPEAKER_GENDERS = ["female", "male", "other"] as const;
 export type SpeakerGender = (typeof SPEAKER_GENDERS)[number];
 
+export const AGE_RANGES = ["under-18", "18-29", "30-44", "45-59", "60-plus"] as const;
+export type AgeRange = (typeof AGE_RANGES)[number];
+
 export type Speaker = {
   /** Slug of the name; also the folder name under `dataset/audio/`. */
   id: string;
   name: string;
   gender?: SpeakerGender;
+  ageRange?: AgeRange;
+  /** Regional accent or dialect, free text (e.g. "Jawa Tengah"). */
+  dialect?: string;
+  /** Microphone model, free text. */
+  microphone?: string;
+  /** When the speaker agreed to the dataset use of their voice. */
+  consentAt?: string;
   notes?: string;
   /** Next `clip_XXXX` sequence number for this speaker. */
   nextSeq: number;
@@ -51,6 +61,11 @@ export type Clip = {
   durationSec: number;
   peakDbfs: number;
   clipped: boolean;
+  /** Speech RMS over the noise floor of the leading silence; absent when no silence was captured. */
+  snrDb?: number;
+  /** Character error rate between the script and an ASR transcript, 0 to 1. */
+  asrCer?: number;
+  asrText?: string;
   recordedAt: string;
   reviewedAt?: string;
 };
@@ -59,7 +74,12 @@ export type AudioRow = { clipId: string; blob: Blob };
 
 export type SkipRow = { speakerId: string; scriptId: string; skippedAt: string };
 
-export type SettingsRow = { key: "app"; value: AppSettings };
+/** What the last successful seed loaded, so a changed pool is detected. */
+export type LibraryMeta = { poolCount: number; g2pVersion: string; seededAt: string };
+
+export type SettingsRow =
+  | { key: "app"; value: AppSettings }
+  | { key: "library"; value: LibraryMeta };
 
 /** A coverage unit label and its id; ids match `units` arrays on sentences. */
 export type UnitRow = { id: number; label: string };
