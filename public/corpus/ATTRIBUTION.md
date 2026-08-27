@@ -12,20 +12,20 @@ Text sources of this corpus and the terms each carries.
 ## News articles listed in corpus/sources.json
 
 - License: Public domain (Voice of America original reporting, US government work). Wire-service material republished by VOA stays with its owner.
-- Entries: 26
+- Entries: 2023
 - Origin: corpus/sources.json
 - Attribution: Each entry carries the article URL and the license declared in corpus/sources.json.
 
 ## Tatoeba (Indonesian sentences)
 
 - License: CC-BY-2.0-FR
-- Entries: 23406
+- Entries: 23403
 - Origin: https://tatoeba.org
 - Attribution: Each sentence carries its Tatoeba id and contributor name in the `attribution` field. Reproduce them.
 
 ## Wikipedia bahasa Indonesia
 
 - License: CC-BY-SA-4.0
-- Entries: 354
+- Entries: 4033
 - Origin: https://id.wikipedia.org
 - Attribution: Each entry names its article in the `attribution` field. Derived datasets must carry the same license.
