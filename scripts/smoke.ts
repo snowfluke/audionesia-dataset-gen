@@ -1,6 +1,6 @@
 // Browser smoke test against the dev server: seeds the corpus, creates a
-// dataset workspace, records with Chrome's fake microphone, reviews, lists
-// clips, exports a ZIP, backs up, and reloads.
+// dataset workspace, records with Chrome's fake microphone, reviews with
+// play/pause, searches the clip list, exports a ZIP, backs up, and reloads.
 // Usage: bun run dev (in another terminal), then bun run smoke. Needs Google Chrome.
 // Screenshots and the ZIPs land in .smoke/.
 import { chromium } from "playwright";
@@ -72,25 +72,42 @@ await page.waitForTimeout(4000);
 await page.getByRole("button", { name: "Berhenti" }).click();
 await page.getByText("Durasi").waitFor({ timeout: 10_000 });
 await shot("04-take");
+console.log("play / pause the take");
+await page.getByRole("button", { name: "Putar", exact: true }).click();
+await page.getByRole("button", { name: "Jeda", exact: true }).waitFor({ timeout: 5_000 });
+await page.getByRole("button", { name: "Jeda", exact: true }).click();
+await page.getByRole("button", { name: "Putar", exact: true }).waitFor({ timeout: 5_000 });
 await page.getByRole("button", { name: "Simpan", exact: true }).click();
 await page.getByText("Klip tersimpan").waitFor({ timeout: 10_000 });
 await shot("05-saved");
 
-console.log("review");
+console.log("review: play, pause, resume, approve");
 await page.getByRole("tab", { name: "Dengarkan" }).click();
-await page.getByRole("button", { name: "Putar" }).waitFor({ timeout: 15_000 });
-await page.getByRole("button", { name: "Putar" }).click();
-await page.waitForTimeout(500);
+const card = page.locator("section", {
+  has: page.getByRole("button", { name: "Ya", exact: true }),
+});
+await card.getByRole("button", { name: "Putar", exact: true }).waitFor({ timeout: 15_000 });
+await card.getByRole("button", { name: "Putar", exact: true }).click();
+await card.getByRole("button", { name: "Jeda", exact: true }).waitFor({ timeout: 5_000 });
+await card.getByRole("button", { name: "Jeda", exact: true }).click();
+await card.getByRole("button", { name: "Putar", exact: true }).waitFor({ timeout: 5_000 });
+await card.getByRole("button", { name: "Putar", exact: true }).click();
+await card.getByRole("button", { name: "Jeda", exact: true }).waitFor({ timeout: 5_000 });
+await shot("06-playing");
 await page.getByRole("button", { name: "Ya", exact: true }).click();
 await page.getByText("Klip disetujui").waitFor({ timeout: 10_000 });
-await page.getByRole("tab", { name: "Disetujui" }).click();
-await page.getByRole("button", { name: "Rekam ulang naskah" }).waitFor({ timeout: 15_000 });
-await shot("06-reviewed");
 
-console.log("clip list");
-await page.getByRole("tab", { name: "Klip" }).click();
+console.log("clip list: filter, search, pagination");
+await page.getByRole("tab", { name: "Disetujui" }).click();
 await page.getByRole("cell", { name: "clip_0001.wav" }).waitFor({ timeout: 15_000 });
-await shot("07-clips");
+await page.getByRole("button", { name: "Rekam ulang naskah" }).waitFor({ timeout: 15_000 });
+await page.getByLabel("Cari klip").fill("tidak-ada-teks-ini");
+await page.getByText("Tidak ada klip yang cocok").waitFor({ timeout: 5_000 });
+await page.getByLabel("Cari klip").fill("clip_0001");
+await page.getByRole("cell", { name: "clip_0001.wav" }).waitFor({ timeout: 5_000 });
+await page.getByText("Halaman 1 dari 1").waitFor({ timeout: 5_000 });
+await page.getByLabel("Cari klip").fill("");
+await shot("07-clip-list");
 
 console.log("dataset + export zip");
 await page.getByRole("tab", { name: "Dataset" }).click();
@@ -132,7 +149,8 @@ await page.getByRole("button", { name: "Buka" }).click();
 await page.getByRole("navigation", { name: "Lokasi" }).waitFor({ timeout: 10_000 });
 await page.reload();
 await page.getByRole("navigation", { name: "Lokasi" }).waitFor({ timeout: 60_000 });
-await page.getByRole("tab", { name: "Klip" }).click();
+await page.getByRole("tab", { name: "Dengarkan" }).click();
+await page.getByRole("tab", { name: "Disetujui" }).click();
 await page.getByRole("cell", { name: "clip_0001.wav" }).waitFor({ timeout: 15_000 });
 await shot("12-after-reload");
 
