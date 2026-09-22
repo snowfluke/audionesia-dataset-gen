@@ -9,7 +9,7 @@
         "@solidjs/web": "2.0.0-rc.3",
         "fflate": "0.8.3",
         "idb": "8.0.3",
-        "indo-g2p": "0.1.2",
+        "indo-g2p": "^0.2.1",
         "solid-js": "2.0.0-rc.3",
         "zod": "4.4.3",
       },
@@ -636,7 +636,7 @@
 
     "imurmurhash": ["imurmurhash@0.1.4", "", {}, "sha512-JmXMZ6wuvDmLiHEml9ykzqO6lwFbof0GG4IkcGaENdCRDDmMVnny7s5HsIgHCbaq0w2MyPhDqkhTUgS2LU2PHA=="],
 
-    "indo-g2p": ["indo-g2p@0.1.2", "", {}, "sha512-mrl8CpL/e2nE2DFRxUof6VF1RUZ+lqm4H6+ZuPTvA+gjU4jAkj5gApF+OviG/vV6vWSE9UPdTEkJiG7XQl71fQ=="],
+    "indo-g2p": ["indo-g2p@0.2.1", "", {}, "sha512-84j2AESUIudldvslJ99tzs5L/E9m9jdoplSHeVEsJWeCzxA+tOLyiafW7PMXzotoH1/6vPZE91nW3ps7Qc5dkg=="],
 
     "inline-style-parser": ["inline-style-parser@0.2.7", "", {}, "sha512-Nb2ctOyNR8DqQoR0OwRG95uNWIC0C1lCgf5Naz5H6Ji72KZ8OcFZLz2P5sNgwlyoJ8Yif11oMuYs5pBQa86csA=="],
 
