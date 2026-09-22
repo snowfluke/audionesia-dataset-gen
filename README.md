@@ -79,14 +79,11 @@ The pool under `public/corpus/` is generated, committed, and rebuilt with:
 
 ```bash
 bun run corpus:common-voice    # 6,344 CC0 sentences from the Common Voice repository
-bun run corpus:tatoeba         # 28,192 CC-BY sentences with per-sentence attribution
-bun run corpus:wikipedia 2000  # random id.wikipedia intros, CC-BY-SA
-bun run corpus:news 200        # feeds listed in corpus/sources.json, read through the ax CLI
 bun run corpus:llm 5           # Claude-written paragraphs for the least-covered units (ANTHROPIC_API_KEY)
 bun run corpus:build           # normalize, filter, dedup, phonemize -> pool.jsonl, index.json, ATTRIBUTION.md
 ```
 
-The build drops fragments under four words and lines that indo-g2p reads mostly as English. `corpus/raw/` is not committed. The current pool holds 30,071 entries, 989 coverage units, and about 52 hours of reading text; `public/corpus/ATTRIBUTION.md` lists what each source requires of a derived dataset.
+The shipped pool is Common Voice plus hand-written CC0 paragraphs (`corpus/raw/llm-fresh-*.jsonl`); scraped sources stay out because foreign names and translationese leak through every filter. The build drops fragments under four words, foreign clauses, Latin taxonomy, and lines that indo-g2p reads mostly as English. `corpus/raw/` is not committed. The current pool holds 5,988 entries, 627 coverage units, and about 6 hours of reading text; `public/corpus/ATTRIBUTION.md` lists what each source requires of a derived dataset.
 
 ## Repository map
 

@@ -28,8 +28,14 @@ const FOREIGN_FUNCTION_WORDS: ReadonlySet<string> = new Set(
 );
 /** Hits that mark a sentence as carrying a foreign clause or title. */
 const FOREIGN_FUNCTION_HITS = 2;
-/** Letter runs no native Indonesian word spells: Dutch `ij`/`sch`, English `th`/`ph`, and friends. */
-const FOREIGN_SPELLING = /(sch|ck|tz|ij|qu|th|ph|rh|gh|oe|ch|x)/;
+/**
+ * Letter runs no native Indonesian word spells: Dutch `sch`, English `th`/`ph`,
+ * doubled stops, and friends. Excluded on purpose: `ij` (`biji`, `hijau`,
+ * `bijak`), `rh` (`terhadap`, `berhasil`), and `gh` (`menghadapi`,
+ * `menghasilkan`), where affixes build the cluster from native roots.
+ */
+const FOREIGN_SPELLING =
+  /(sch|ck|tz|qu|th|ph|oe|ch|x|bb|cc|dd|jj|pp|qq|tt|vv|ww|xx|zz)/;
 /** Qur'anic spellings are the one native use of `qu`. */
 const QURANIC_WORD = /^(al)?qur'?an$|^qunut$|^iqra$|^qori$|^qari$/;
 /** Words with foreign spelling that mark a sentence as non-Indonesian. */

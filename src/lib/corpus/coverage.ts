@@ -85,14 +85,14 @@ export function detectPhenomena(
   return found;
 }
 
-/** Share of words indo-g2p read as English, 0 to 1. Above about 0.4 the sentence is not Indonesian. */
+/** Share of words indo-g2p read as English, 0 to 1. Above about 0.3 the sentence is not Indonesian. */
 export function englishShare(traces: readonly WordTrace[]): number {
   if (traces.length === 0) return 0;
   return traces.filter((trace) => trace.source === "english").length / traces.length;
 }
 
 /** Sentences with at least this share of English readings are foreign text, not loanwords. */
-export const FOREIGN_SHARE = 0.4;
+export const FOREIGN_SHARE = 0.3;
 
 /** Every coverage unit of a sentence as a label: `p:<phone>`, `d:<a>.<b>`, `f:<phenomenon>`. */
 export function unitLabels(text: string, phonemes: string, traces: readonly WordTrace[]): string[] {

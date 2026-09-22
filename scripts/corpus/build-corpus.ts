@@ -29,11 +29,17 @@ const PARAGRAPH_SOURCES: ReadonlySet<CorpusSource> = new Set(["wikipedia", "news
 type Analyzed = { text: string; phonemes: string; syllables: number; labels: string[] };
 type SourceTally = { license: string; count: number };
 
-/** Null when indo-g2p reads most of the words as English: a quote or caption in another language. */
+/**
+ * Null when the sentence is not Indonesian to read: mostly English, or a
+ * code-switched phrase like `break points` hiding in a long frame. A single
+ * loanword (`pizza`, `download`) still passes.
+ */
 function analyze(sentence: string): Analyzed | null {
   const result = toPhoneme(sentence);
   const traces = explain(sentence);
+  const english = traces.filter((trace) => trace.source === "english").length;
   if (englishShare(traces) >= FOREIGN_SHARE) return null;
+  if (english >= 2 && english / traces.length >= 0.2) return null;
   const syllables = result.syllables.filter((syllable) => syllable !== " ").length;
   const labels = unitLabels(sentence, result.phonemes, traces);
   return { text: sentence, phonemes: result.phonemes, syllables, labels };
