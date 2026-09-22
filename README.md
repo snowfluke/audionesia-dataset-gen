@@ -83,7 +83,7 @@ bun run corpus:llm 5           # Claude-written paragraphs for the least-covered
 bun run corpus:build           # normalize, filter, dedup, phonemize -> pool.jsonl, index.json, ATTRIBUTION.md
 ```
 
-The shipped pool is Common Voice plus hand-written CC0 paragraphs (`corpus/raw/llm-fresh-*.jsonl`); scraped sources stay out because foreign names and translationese leak through every filter. The build drops fragments under four words, foreign clauses, Latin taxonomy, and lines that indo-g2p reads mostly as English. `corpus/raw/` is not committed. The current pool holds 5,988 entries, 627 coverage units, and about 6 hours of reading text; `public/corpus/ATTRIBUTION.md` lists what each source requires of a derived dataset.
+The shipped pool is Common Voice plus hand-written CC0 paragraphs (`corpus/raw/llm-fresh-*.jsonl`); scraped sources stay out because foreign names and translationese leak through every filter. The build drops fragments under four words, foreign clauses, Latin taxonomy, and lines that indo-g2p reads mostly as English. `corpus/raw/` is not committed. The current pool holds 10,531 entries, 697 coverage units, and about 10 hours of reading text; `public/corpus/ATTRIBUTION.md` lists what each source requires of a derived dataset.
 
 ## Repository map
 
