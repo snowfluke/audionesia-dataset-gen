@@ -66,6 +66,8 @@ while (fetched < wanted) {
     for (const paragraph of (page.extract ?? "").split(/\n+/)) {
       const text = paragraph.trim();
       if (text.length < MIN_PARAGRAPH_CHARS || rows.has(text)) continue;
+      // Language-template residue ("code: en is deprecated") is markup, not prose.
+      if (/code:\s*[a-z]{2}\b|is deprecated|\{\{|\}\}/.test(text)) continue;
       rows.set(text, {
         text,
         source: "wikipedia",

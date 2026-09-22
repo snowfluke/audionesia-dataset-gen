@@ -13,7 +13,11 @@ export type BuilderOptions = {
   maxSyllables: number;
   /** Stop after this many scripts; the pool may run dry first. */
   scriptCount: number;
-  /** Gain multiplier per source. Paragraph sources read more naturally than one-liners. */
+  /**
+   * Gain multiplier per source. Hand-written reading sentences (Common Voice,
+   * LLM-crafted) lead because they read cleanly aloud; Wikipedia and Tatoeba
+   * trail because they carry foreign names and translationese.
+   */
   sourceWeights?: ReadonlyMap<string, number>;
   /**
    * While filling a script, an entry from the script's own source wins as long
@@ -31,9 +35,11 @@ export type BuildResult = {
 };
 
 export const DEFAULT_SOURCE_WEIGHTS: ReadonlyMap<string, number> = new Map([
-  ["wikipedia", 1.4],
-  ["news", 1.6],
+  ["common-voice", 1.2],
   ["llm", 1.6],
+  ["news", 1.0],
+  ["wikipedia", 0.8],
+  ["tatoeba", 0.8],
 ]);
 export const DEFAULT_SAME_SOURCE_TOLERANCE = 0;
 

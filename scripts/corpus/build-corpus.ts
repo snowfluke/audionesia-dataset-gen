@@ -18,15 +18,13 @@ import type {
   RawSentence,
 } from "../../src/lib/corpus/schema.ts";
 import { rawSentenceSchema } from "../../src/lib/corpus/schema.ts";
-import { packByTotal, splitSentences } from "../../src/lib/corpus/split.ts";
+import { splitSentences } from "../../src/lib/corpus/split.ts";
 import { DEFAULT_SYLLABLES_PER_SECOND } from "../../src/lib/duration.ts";
 import { textId } from "../../src/lib/hash.ts";
 import { PUBLIC_DIR, RAW_DIR } from "./shared.ts";
 
 /** Sources whose rows are prose paragraphs rather than single sentences. */
 const PARAGRAPH_SOURCES: ReadonlySet<CorpusSource> = new Set(["wikipedia", "news", "llm"]);
-/** 30 s at the default reading rate; longer paragraphs are split at sentence boundaries. */
-const MAX_SYLLABLES_PER_ENTRY = Math.round(30 * DEFAULT_SYLLABLES_PER_SECOND);
 
 type Analyzed = { text: string; phonemes: string; syllables: number; labels: string[] };
 type SourceTally = { license: string; count: number };
@@ -39,17 +37,6 @@ function analyze(sentence: string): Analyzed | null {
   const syllables = result.syllables.filter((syllable) => syllable !== " ").length;
   const labels = unitLabels(sentence, result.phonemes, traces);
   return { text: sentence, phonemes: result.phonemes, syllables, labels };
-}
-
-function mergeRun(run: readonly Analyzed[]): Analyzed {
-  const labels = new Set<string>();
-  for (const part of run) for (const label of part.labels) labels.add(label);
-  return {
-    text: run.map((part) => part.text).join(" "),
-    phonemes: run.map((part) => part.phonemes).join(" "),
-    syllables: run.reduce((sum, part) => sum + part.syllables, 0),
-    labels: [...labels].sort(),
-  };
 }
 
 function tally(counter: Map<string, number>, key: string): void {
@@ -91,7 +78,6 @@ for (const file of files) {
     const isParagraph = PARAGRAPH_SOURCES.has(row.source);
     const normalized = normalizeSentence(row.text);
     const sentences = isParagraph ? splitSentences(normalized) : [normalized];
-    const accepted: Analyzed[] = [];
     for (const sentence of sentences) {
       const reason = rejectReason(sentence);
       if (reason !== null) {
@@ -109,19 +95,12 @@ for (const file of files) {
         tally(rejected, "foreign");
         continue;
       }
-      accepted.push(analyzed);
-    }
-    const runs = isParagraph
-      ? packByTotal(accepted, (entry) => entry.syllables, MAX_SYLLABLES_PER_ENTRY)
-      : accepted.map((entry) => [entry]);
-    for (const run of runs) {
-      const merged = mergeRun(run);
       pool.push({
-        id: await textId(dedupKey(merged.text)),
-        text: merged.text,
-        phonemes: merged.phonemes,
-        syllables: merged.syllables,
-        units: merged.labels.map((label) => internUnit(table, label)),
+        id: await textId(dedupKey(analyzed.text)),
+        text: analyzed.text,
+        phonemes: analyzed.phonemes,
+        syllables: analyzed.syllables,
+        units: analyzed.labels.map((label) => internUnit(table, label)),
         source: row.source,
         license: row.license,
         attribution: row.attribution,
