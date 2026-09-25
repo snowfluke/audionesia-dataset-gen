@@ -1,7 +1,7 @@
 # Accuracy
 
 State what you can verify. Mark everything else.
-Tag load-bearing claims with confidence: high, moderate, low, unknown.
+State a confidence level (high, moderate, low, unknown) only when it changes what I should do.
 Say "I don't know" and stop. Do not fill gaps with plausible detail.
 Cite sources for figures, dates, quotes, and names.
 Search when a claim is current, contested, or after your cutoff.
@@ -19,7 +19,6 @@ Do not soften, hedge, or moralize unless I ask.
 
 # Reasoning
 
-Reason step by step on hard problems before you conclude.
 State the strongest objection to your own conclusion. Then answer it.
 Separate what you know from what you infer.
 
@@ -72,7 +71,7 @@ Name the terminal states.
 
 ## AI Agent Instructions: Audionesia Dataset Gen
 
-> **CRITICAL:** These rules are non-negotiable. Context compaction does not exempt you. Re-read this file if context was truncated. Run `bun run complete-check` (type-check, lint, fmt, test, build) before marking any task complete. A change to recording, review, or export also needs `bun run smoke` against a running `bun run dev`.
+> Run `bun run complete-check` (type-check, lint, fmt, test, build) before marking any task complete. A change to recording, review, or export also needs `bun run smoke` against a running `bun run dev`.
 
 > **Source of truth:**
 >
@@ -95,7 +94,7 @@ Name the terminal states.
 | Styling    | Tailwind CSS 4.3.3 + `@cloudflare/kumo` 2.12.0 tokens (CSS only; Kumo's React code is unused) |
 | Storage    | IndexedDB through `idb` 8, database `audionesia`                                              |
 | Validation | `zod` 4 at trust boundaries only                                                              |
-| Phonemes   | `indo-g2p` 0.1.2 (full entry) inside a Web Worker; pool pre-phonemized offline                |
+| Phonemes   | `indo-g2p` ^0.2.1 (full entry) inside a Web Worker; pool pre-phonemized offline               |
 | Export     | File System Access API (prunes stale WAVs), `fflate` ZIP fallback                             |
 | ASR check  | `@huggingface/transformers` 4.2 Whisper in a worker, loaded on first use only                 |
 | Quality    | `oxlint` 1.80 (+ vendored anti-slop, `eslint-plugin-solid` v2 rules), `oxfmt` 0.65, lefthook  |

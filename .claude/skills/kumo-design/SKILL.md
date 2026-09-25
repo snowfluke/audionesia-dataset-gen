@@ -1,6 +1,6 @@
 ---
 name: kumo-design
-description: Cloudflare product design guidance. Use when designing, implementing, or reviewing Cloudflare dashboard interfaces, Kumo UI, responsive styling, dialogs, or frontend tests.
+description: Kumo design rules as applied to this app's hand-rolled Solid components - text size, heading case, spacing, rings, radii, icons, dialogs. Use when you style, add, or review a component or a class string under src/.
 ---
 
 # Cloudflare Design
