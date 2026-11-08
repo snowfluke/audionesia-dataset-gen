@@ -39,7 +39,7 @@
     "idb": "8.0.3",
     "indo-g2p": "^0.2.1",
     "solid-js": "2.0.0-rc.3",
-    "zod": "4.4.3"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.121.0",
@@ -50,15 +50,20 @@
     "@types/bun": "^1.3.14",
     "eslint-plugin-solid": "0.16.1",
     "lefthook": "2.1.10",
-    "oxfmt": "0.65.0",
+    "oxfmt": "0.77.0",
     "oxlint": "1.80.0",
     "playwright": "1.62.1",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
-    "vite": "8.2.2"
+    "vite": "8.2.4"
   },
   "overrides": {
-    "sharp": "0.35.4",
-    "adm-zip": "0.6.1"
+    "sharp": "0.35.5",
+    "adm-zip": "0.6.1",
+    "minimatch": "11.0.5",
+    "brace-expansion": "5.0.12",
+    "source-map-js": "1.2.2",
+    "seroval": "1.6.12",
+    "seroval-plugins": "1.6.12"
   }
 }
