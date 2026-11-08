@@ -3,7 +3,6 @@ import { For, Show } from "solid-js";
 
 import Banner from "../../components/banner.tsx";
 import Button from "../../components/button.tsx";
-import LayerCard from "../../components/layer-card.tsx";
 import Meter from "../../components/meter.tsx";
 import Switch from "../../components/switch.tsx";
 import { attempt } from "../../components/toast.tsx";
@@ -25,7 +24,7 @@ export default function ExportPanel(props: ExportPanelProps): JSX.Element {
   const busy = (): boolean => props.store.progress() !== null;
   return (
     <>
-      <LayerCard class="flex flex-col gap-3">
+      <section class="flex flex-col gap-3">
         <h2 class="text-lg font-semibold text-kumo-strong">Ekspor dataset</h2>
         <p class="text-base text-kumo-subtle">
           Hanya klip yang disetujui yang diekspor. speakers.jsonl, manifest.json, dan ATTRIBUTION.md
@@ -101,9 +100,9 @@ export default function ExportPanel(props: ExportPanelProps): JSX.Element {
             </ul>
           </Banner>
         </Show>
-      </LayerCard>
+      </section>
 
-      <LayerCard class="flex flex-col gap-3">
+      <section class="flex flex-col gap-3">
         <h2 class="text-lg font-semibold text-kumo-strong">Pemeriksaan ASR</h2>
         <p class="text-base text-kumo-subtle">
           Whisper ({settings().asrModel.replace("onnx-community/", "")}) berjalan di peramban dan
@@ -112,6 +111,7 @@ export default function ExportPanel(props: ExportPanelProps): JSX.Element {
           Model diunduh sekali dan disimpan peramban.
         </p>
         <Button
+          class="self-start"
           disabled={busy()}
           onClick={() => {
             const store = props.store;
@@ -120,7 +120,7 @@ export default function ExportPanel(props: ExportPanelProps): JSX.Element {
         >
           Periksa semua klip menunggu
         </Button>
-      </LayerCard>
+      </section>
     </>
   );
 }

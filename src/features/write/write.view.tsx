@@ -2,9 +2,8 @@ import type { JSX } from "@solidjs/web";
 import { For, Show, createSignal } from "solid-js";
 
 import Banner from "../../components/banner.tsx";
-import Button from "../../components/button.tsx";
+import Button, { buttonClass } from "../../components/button.tsx";
 import InputArea from "../../components/input-area.tsx";
-import LayerCard from "../../components/layer-card.tsx";
 import { Cell, Head, Row, Table } from "../../components/table.tsx";
 import { attempt } from "../../components/toast.tsx";
 import { SAMPLE_FILES, sampleDataUrl } from "../../lib/corpus/sample-text.ts";
@@ -26,7 +25,7 @@ export default function WriteView(): JSX.Element {
   };
 
   return (
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-6">
       <div class="flex flex-col gap-1">
         <h2 class="text-lg font-semibold text-kumo-strong">Teks sendiri</h2>
         <p class="text-base text-kumo-subtle">
@@ -36,8 +35,11 @@ export default function WriteView(): JSX.Element {
           bisa dijatuhkan ke kotak ini.
         </p>
       </div>
-      <LayerCard
-        class={["flex flex-col gap-3", { "ring-2 ring-kumo-focus": dragging() }]}
+      <section
+        class={[
+          "flex flex-col gap-3 rounded-xl",
+          { "ring-2 ring-kumo-focus ring-offset-4 ring-offset-kumo-canvas": dragging() },
+        ]}
         onDragOver={(event) => {
           event.preventDefault();
           setDragging(true);
@@ -60,13 +62,18 @@ export default function WriteView(): JSX.Element {
           >
             {store.phase() === "analyzing" ? "Mengubah ke fonem..." : "Pratinjau fonem"}
           </Button>
-          <label class="cursor-pointer text-base text-kumo-link">
+          <label
+            class={[
+              ...buttonClass("secondary", "base"),
+              "focus-within:ring-2 focus-within:ring-kumo-focus",
+            ]}
+          >
             Pilih berkas
             <input
               type="file"
               multiple
               accept=".txt,.tsv,.csv,.jsonl,.json"
-              class="hidden"
+              class="sr-only"
               onChange={(event) => {
                 const files = event.currentTarget.files;
                 if (files !== null && files.length > 0) void attempt(() => store.addFiles(files));
@@ -108,10 +115,10 @@ export default function WriteView(): JSX.Element {
             </ul>
           </details>
         </Show>
-      </LayerCard>
+      </section>
 
       <Show when={store.phase() === "previewing" || store.phase() === "saving"}>
-        <LayerCard class="flex flex-col gap-3">
+        <section class="flex flex-col gap-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="text-base font-medium text-kumo-strong">
               {formatCount(store.preview().length)} kalimat siap ditambahkan
@@ -157,7 +164,7 @@ export default function WriteView(): JSX.Element {
               </For>
             </tbody>
           </Table>
-        </LayerCard>
+        </section>
       </Show>
     </div>
   );

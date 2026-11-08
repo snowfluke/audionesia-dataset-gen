@@ -38,6 +38,7 @@ export type RecordStore = {
   phase: () => RecordPhase;
   level: () => Level;
   devices: () => InputDevice[];
+  openDeviceLabel: () => string | null;
   take: () => Take | null;
   playState: () => PlayState;
   batchDone: () => number;
@@ -239,6 +240,7 @@ export function createRecordStore(): RecordStore {
     phase,
     level: capture.level,
     devices: capture.devices,
+    openDeviceLabel: capture.openDeviceLabel,
     take,
     playState: player.state,
     batchDone,

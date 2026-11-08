@@ -9,6 +9,8 @@ export type Capture = {
   phase: () => CapturePhase;
   level: () => Level;
   devices: () => InputDevice[];
+  /** Label of the open microphone, or null while it is closed. */
+  openDeviceLabel: () => string | null;
   refreshDevices: () => Promise<void>;
   /** Opens the microphone; `deviceId` "" means the system default. */
   arm: (deviceId: string) => Promise<void>;
@@ -22,6 +24,7 @@ export function createCapture(onLost: (reason: string) => void): Capture {
   const [phase, setPhase] = createSignal<CapturePhase>("idle");
   const [level, setLevel] = createSignal<Level>({ rms: 0, peak: 0 });
   const [devices, setDevices] = createSignal<InputDevice[]>([]);
+  const [openDeviceLabel, setOpenDeviceLabel] = createSignal<string | null>(null);
   let recorder: Recorder | null = null;
 
   async function refreshDevices(): Promise<void> {
@@ -37,6 +40,7 @@ export function createCapture(onLost: (reason: string) => void): Capture {
     recorder = null;
     setPhase("idle");
     setLevel({ rms: 0, peak: 0 });
+    setOpenDeviceLabel(null);
     if (current !== null) await current.close();
   }
 
@@ -50,7 +54,9 @@ export function createCapture(onLost: (reason: string) => void): Capture {
           void close();
           onLost(reason);
         },
+        onDevicesChange: () => void refreshDevices(),
       });
+      setOpenDeviceLabel(recorder.deviceLabel);
       setPhase("ready");
       await refreshDevices();
     } catch (cause: unknown) {
@@ -73,5 +79,5 @@ export function createCapture(onLost: (reason: string) => void): Capture {
     return recording;
   }
 
-  return { phase, level, devices, refreshDevices, arm, start, stop, close };
+  return { phase, level, devices, openDeviceLabel, refreshDevices, arm, start, stop, close };
 }

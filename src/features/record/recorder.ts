@@ -13,11 +13,15 @@ export type RecorderEvents = {
   onLevel: (level: Level) => void;
   /** The microphone went away or the browser paused audio; the take should stop. */
   onLost: (reason: string) => void;
+  /** A microphone was plugged in or removed; the device list is stale. */
+  onDevicesChange: () => void;
 };
 
 export type Recorder = {
   /** The device rate; the master WAV is stored at this rate. */
   sampleRate: number;
+  /** The device the browser opened. The system default can be the built-in microphone. */
+  deviceLabel: string;
   start(): void;
   stop(): Recording;
   close(): Promise<void>;
@@ -55,7 +59,11 @@ export async function createRecorder(deviceId: string, events: RecorderEvents): 
   const context = new AudioContext();
   let node: AudioWorkletNode;
   let source: MediaStreamAudioSourceNode;
+  let track: MediaStreamTrack;
   try {
+    const [first] = stream.getAudioTracks();
+    if (first === undefined) throw new Error("getUserMedia returned no audio track");
+    track = first;
     await context.audioWorklet.addModule(workletUrl);
     source = context.createMediaStreamSource(stream);
     node = new AudioWorkletNode(context, RECORDER_PROCESSOR_NAME);
@@ -86,9 +94,11 @@ export async function createRecorder(deviceId: string, events: RecorderEvents): 
   context.onstatechange = () => {
     if (context.state === "suspended") void resumeOrLose();
   };
+  navigator.mediaDevices.addEventListener("devicechange", events.onDevicesChange);
 
   return {
     sampleRate: context.sampleRate,
+    deviceLabel: track.label,
     start() {
       blocks = [];
       recording = true;
@@ -108,6 +118,7 @@ export async function createRecorder(deviceId: string, events: RecorderEvents): 
     async close() {
       node.port.onmessage = null;
       context.onstatechange = null;
+      navigator.mediaDevices.removeEventListener("devicechange", events.onDevicesChange);
       source.disconnect();
       node.disconnect();
       for (const track of stream.getTracks()) track.stop();

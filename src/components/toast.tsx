@@ -2,15 +2,16 @@ import type { JSX } from "@solidjs/web";
 import { For, createSignal } from "solid-js";
 
 const TOAST_MS = 4000;
-/** Older toasts drop off so the stack never grows past this. */
-const MAX_TOASTS = 3;
+/** A new toast replaces the one on screen, so toasts never pile up over the content. */
+const MAX_TOASTS = 1;
 
 export type ToastTone = "info" | "success" | "error";
 type Toast = { id: number; message: string; tone: ToastTone };
 
+// Only an error carries colour; info and success are routine confirmations.
 const TONES = {
-  info: "bg-kumo-info-tint text-kumo-info",
-  success: "bg-kumo-success-tint text-kumo-success",
+  info: "bg-kumo-base text-kumo-default",
+  success: "bg-kumo-base text-kumo-default",
   error: "bg-kumo-danger-tint text-kumo-danger",
 } as const;
 

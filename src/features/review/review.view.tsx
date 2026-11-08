@@ -20,11 +20,7 @@ export default function ReviewView(): JSX.Element {
   const [confirmDelete, setConfirmDelete] = createSignal(false);
 
   return (
-    <div class="flex flex-col gap-4">
-      <p class="text-base text-kumo-subtle">
-        <Kbd>Spasi</Kbd> putar / jeda · <Kbd>Y</Kbd> setujui · <Kbd>N</Kbd> tolak. Pilih klip lain
-        dari daftar di bawah.
-      </p>
+    <div class="flex flex-col gap-8">
       <Loading fallback={<p class="text-kumo-subtle">Memuat klip...</p>}>
         <Show when={store.current()}>
           {(clip) => (
@@ -64,12 +60,16 @@ export default function ReviewView(): JSX.Element {
                 <Waveform samples={store.waveform()} label="Bentuk gelombang klip" />
               </Loading>
               <div class="flex flex-wrap items-center gap-2">
-                <Button variant="primary" size="lg" onClick={() => void attempt(store.togglePlay)}>
+                <Button
+                  variant={clip().status === "approved" ? "primary" : "outline"}
+                  size="lg"
+                  onClick={() => void attempt(store.togglePlay)}
+                >
                   {store.playState() === "playing" ? "Jeda" : "Putar"}
                 </Button>
                 <Show when={clip().status !== "approved"}>
                   <Button
-                    variant="success"
+                    variant="primary"
                     size="lg"
                     onClick={() => void attempt(() => store.decide("approved"))}
                   >
@@ -102,6 +102,10 @@ export default function ReviewView(): JSX.Element {
                 </Button>
                 <BatchDots done={store.batchDone()} size={settings().batchSize} />
               </div>
+              <p class="text-xs text-kumo-subtle">
+                <Kbd>Spasi</Kbd> putar / jeda · <Kbd>Y</Kbd> setujui · <Kbd>N</Kbd> tolak. Pilih
+                klip lain dari daftar di bawah.
+              </p>
             </LayerCard>
           )}
         </Show>
