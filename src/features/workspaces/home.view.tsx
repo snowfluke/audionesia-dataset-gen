@@ -98,7 +98,7 @@ export default function HomeView(): JSX.Element {
   };
 
   return (
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-6">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-col gap-1">
           <h2 class="text-lg font-semibold text-kumo-strong">Dataset</h2>

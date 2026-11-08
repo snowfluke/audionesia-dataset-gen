@@ -15,7 +15,7 @@ export default function InputArea(props: InputAreaProps): JSX.Element {
       {...rest}
       class={[
         FIELD_BASE,
-        "rounded-lg px-3 py-2 text-base",
+        "rounded-lg px-3 py-2 text-lg",
         FIELD_VARIANTS[local.variant],
         local.class,
       ]}

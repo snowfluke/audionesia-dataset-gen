@@ -5,10 +5,11 @@ import { merge, omit } from "solid-js";
 export const FIELD_BASE =
   "w-full bg-kumo-base text-kumo-default ring ring-kumo-line outline-none placeholder:text-kumo-subtle disabled:bg-kumo-base/50 disabled:text-kumo-default/70";
 
+// Fields use 16px (text-lg), not Kumo's 14px: iOS Safari zooms the page when a field under 16px gets focus.
 export const FIELD_SIZES = {
-  sm: "h-6.5 rounded-md px-2 text-xs",
-  base: "h-9 rounded-lg px-3 text-base",
-  lg: "h-10 rounded-lg px-4 text-base",
+  sm: "h-8 rounded-md px-2 text-lg",
+  base: "h-9 rounded-lg px-3 text-lg",
+  lg: "h-10 rounded-lg px-4 text-lg",
 } as const;
 
 export const FIELD_VARIANTS = {

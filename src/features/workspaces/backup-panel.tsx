@@ -1,8 +1,7 @@
 import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
 
-import Button from "../../components/button.tsx";
-import LayerCard from "../../components/layer-card.tsx";
+import Button, { buttonClass } from "../../components/button.tsx";
 import Meter from "../../components/meter.tsx";
 import { attempt } from "../../components/toast.tsx";
 import type { HomeStore } from "./home.store.ts";
@@ -13,7 +12,7 @@ export type BackupPanelProps = { store: HomeStore };
 export default function BackupPanel(props: BackupPanelProps): JSX.Element {
   const busy = (): boolean => props.store.progress() !== null;
   return (
-    <LayerCard class="flex flex-col gap-3">
+    <section class="mt-4 flex flex-col gap-3">
       <h2 class="text-lg font-semibold text-kumo-strong">Cadangan semua dataset</h2>
       <p class="text-base text-kumo-subtle">
         Peramban bisa menghapus penyimpanan lokal kapan saja. Cadangan menyimpan setiap dataset,
@@ -41,18 +40,22 @@ export default function BackupPanel(props: BackupPanelProps): JSX.Element {
           Cadangkan sebagai ZIP
         </Button>
         <Button
-          variant="outline"
           disabled={busy() || !props.store.canPickDirectory()}
           onClick={() => void attempt(props.store.restoreFromFolder)}
         >
           Pulihkan dari folder
         </Button>
-        <label class="inline-flex cursor-pointer items-center text-base text-kumo-link">
+        <label
+          class={[
+            ...buttonClass("secondary", "base"),
+            "focus-within:ring-2 focus-within:ring-kumo-focus has-disabled:cursor-not-allowed has-disabled:opacity-50",
+          ]}
+        >
           Pulihkan dari ZIP
           <input
             type="file"
             accept=".zip"
-            class="hidden"
+            class="sr-only"
             disabled={busy()}
             onChange={(event) => {
               const store = props.store;
@@ -73,6 +76,6 @@ export default function BackupPanel(props: BackupPanelProps): JSX.Element {
           />
         )}
       </Show>
-    </LayerCard>
+    </section>
   );
 }

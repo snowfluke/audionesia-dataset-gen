@@ -13,8 +13,6 @@ const VARIANTS = {
   secondary:
     "bg-kumo-base !text-kumo-default ring not-disabled:hover:bg-kumo-tint disabled:bg-kumo-base/50 disabled:!text-kumo-default/70 ring-kumo-line",
   ghost: "text-kumo-default hover:bg-kumo-tint shadow-none bg-inherit",
-  success:
-    "bg-kumo-success text-white ring ring-kumo-success not-disabled:hover:opacity-90 disabled:opacity-50",
   destructive: "bg-kumo-danger !text-white ring ring-kumo-danger disabled:opacity-50",
   outline:
     "bg-transparent text-kumo-default ring ring-kumo-line not-disabled:hover:text-kumo-strong not-disabled:hover:ring-kumo-hairline",
@@ -27,16 +25,24 @@ const SIZES = {
   lg: "h-10 gap-2 rounded-lg px-4 text-base",
 } as const;
 
+export type ButtonVariant = keyof typeof VARIANTS;
+export type ButtonSize = keyof typeof SIZES;
+
 export type ButtonProps = ComponentProps<"button"> & {
-  variant?: keyof typeof VARIANTS;
-  size?: keyof typeof SIZES;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
 };
+
+/** Button classes for an element that cannot be a `<button>`, such as a file-picker label. */
+export function buttonClass(variant: ButtonVariant, size: ButtonSize): string[] {
+  return [BASE, VARIANTS[variant], SIZES[size]];
+}
 
 export default function Button(props: ButtonProps): JSX.Element {
   const local = merge({ variant: "secondary", size: "base", type: "button" } as const, props);
   const rest = omit(local, "variant", "size", "class", "children");
   return (
-    <button {...rest} class={[BASE, VARIANTS[local.variant], SIZES[local.size], local.class]}>
+    <button {...rest} class={[...buttonClass(local.variant, local.size), local.class]}>
       {local.children}
     </button>
   );

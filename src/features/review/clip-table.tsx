@@ -83,10 +83,7 @@ export default function ClipTable(props: ClipTableProps): JSX.Element {
             <For each={list().visible()}>
               {(clip) => (
                 <Row
-                  class={[
-                    "cursor-pointer",
-                    { "outline-2 -outline-offset-2 outline-kumo-contrast": isCurrent(clip) },
-                  ]}
+                  class={["cursor-pointer", { "bg-kumo-tint": isCurrent(clip) }]}
                   aria-current={isCurrent(clip) ? "true" : "false"}
                   onClick={() => props.store.select(clip)}
                 >

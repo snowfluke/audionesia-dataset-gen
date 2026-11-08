@@ -3,7 +3,6 @@ import { Errored, Match, Show, Switch, createSignal } from "solid-js";
 
 import type { HelpTopic } from "./app-help.tsx";
 import HelpDialogs from "./app-help.tsx";
-import Badge from "./components/badge.tsx";
 import Banner from "./components/banner.tsx";
 import Button from "./components/button.tsx";
 import Tabs from "./components/tabs.tsx";
@@ -56,7 +55,6 @@ export default function App(): JSX.Element {
               </Button>
               <span class="text-kumo-subtle">/</span>
               <span class="font-medium text-kumo-strong">{workspace().name}</span>
-              <Badge>{workspace().speaker.name}</Badge>
             </nav>
           )}
         </Show>
@@ -138,10 +136,10 @@ export default function App(): JSX.Element {
       </main>
 
       <footer class="flex items-center gap-2 border-t border-kumo-line bg-kumo-base px-6 py-3">
-        <Button variant="outline" size="sm" onClick={() => setHelp("guide")}>
+        <Button variant="ghost" size="sm" onClick={() => setHelp("guide")}>
           Panduan
         </Button>
-        <Button variant="outline" size="sm" onClick={() => setHelp("shortcuts")}>
+        <Button variant="ghost" size="sm" onClick={() => setHelp("shortcuts")}>
           Pintasan keyboard
         </Button>
       </footer>

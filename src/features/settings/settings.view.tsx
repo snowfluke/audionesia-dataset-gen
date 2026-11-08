@@ -3,7 +3,6 @@ import { For, Show, createSignal } from "solid-js";
 
 import Button from "../../components/button.tsx";
 import Input from "../../components/input.tsx";
-import LayerCard from "../../components/layer-card.tsx";
 import Select from "../../components/select.tsx";
 import Switch from "../../components/switch.tsx";
 import { attempt, showToast } from "../../components/toast.tsx";
@@ -128,8 +127,8 @@ export default function SettingsView(): JSX.Element {
   }
 
   return (
-    <div class="flex flex-col gap-4">
-      <LayerCard class="flex flex-col gap-4">
+    <div class="flex flex-col gap-10">
+      <section class="flex flex-col gap-4">
         <h2 class="text-lg font-semibold text-kumo-strong">Jendela durasi dan target</h2>
         <label class="flex flex-col gap-1 text-base">
           Preset pelatih
@@ -160,9 +159,9 @@ export default function SettingsView(): JSX.Element {
         >
           Susun ulang naskah dengan jendela ini
         </Button>
-      </LayerCard>
+      </section>
 
-      <LayerCard class="flex flex-col gap-3">
+      <section class="flex flex-col gap-3">
         <h2 class="text-lg font-semibold text-kumo-strong">Kalibrasi laju bicara</h2>
         <p class="text-base text-kumo-subtle">
           Menghitung suku kata per detik dari klip dataset ini yang sudah disetujui (minimal{" "}
@@ -188,9 +187,9 @@ export default function SettingsView(): JSX.Element {
             )}
           </Show>
         </div>
-      </LayerCard>
+      </section>
 
-      <LayerCard class="flex flex-col gap-4">
+      <section class="flex flex-col gap-4">
         <h2 class="text-lg font-semibold text-kumo-strong">Audio dan kualitas</h2>
         <NumberFields fields={AUDIO_FIELDS} />
         <Switch
@@ -230,7 +229,7 @@ export default function SettingsView(): JSX.Element {
           onChange={(checked) => void attempt(() => updateSettings({ showPhonemes: checked }))}
           label="Tampilkan fonem di bawah naskah"
         />
-      </LayerCard>
+      </section>
     </div>
   );
 }
