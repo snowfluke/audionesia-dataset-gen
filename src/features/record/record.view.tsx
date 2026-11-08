@@ -35,8 +35,14 @@ export default function RecordView(): JSX.Element {
     if (peak === 0) return "Senyap";
     return `${amplitudeToDbfs(peak).toFixed(0)} dBFS`;
   };
+  const systemDefaultLabel = (): string => {
+    const open = store.openDeviceLabel();
+    return settings().inputDeviceId === "" && open !== null && open !== ""
+      ? `Mikrofon bawaan sistem (${open})`
+      : "Mikrofon bawaan sistem";
+  };
   const deviceOptions = (): { value: string; label: string }[] => [
-    { value: "", label: "Mikrofon bawaan sistem" },
+    { value: "", label: systemDefaultLabel() },
     ...store.devices().map((device) => ({ value: device.deviceId, label: device.label })),
   ];
   const recordLabel = (): string => {
@@ -58,7 +64,7 @@ export default function RecordView(): JSX.Element {
   };
 
   return (
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-6">
       <Loading fallback={<p class="text-kumo-subtle">Memuat antrean naskah...</p>}>
         <Show
           when={store.current()}
@@ -102,7 +108,7 @@ export default function RecordView(): JSX.Element {
         </Show>
       </Loading>
 
-      <LayerCard class="flex flex-col gap-3">
+      <section class="flex flex-col gap-3">
         <div class="flex flex-wrap items-end gap-3">
           <div class="flex-1">
             <Meter
@@ -170,7 +176,7 @@ export default function RecordView(): JSX.Element {
             >
               Simpan
             </Button>
-            <Button onClick={() => void attempt(store.play)}>
+            <Button variant="outline" onClick={() => void attempt(store.play)}>
               {store.playState() === "playing" ? "Jeda" : "Putar"}
             </Button>
           </Show>
@@ -187,7 +193,7 @@ export default function RecordView(): JSX.Element {
           <Kbd>Spasi</Kbd> rekam / berhenti · <Kbd>Enter</Kbd> simpan · <Kbd>R</Kbd> rekam ulang ·{" "}
           <Kbd>P</Kbd> putar / jeda · <Kbd>S</Kbd> lewati
         </p>
-      </LayerCard>
+      </section>
     </div>
   );
 }
