@@ -96,6 +96,15 @@ await page.getByRole("button", { name: "Simpan", exact: true }).click();
 await page.getByText("Klip tersimpan").waitFor({ timeout: 10_000 });
 await shot("05-saved");
 
+console.log("record two more clips for the batch approve");
+for (const _ of [1, 2]) {
+  await page.getByRole("button", { name: "Rekam", exact: true }).click();
+  await page.waitForTimeout(3000);
+  await page.getByRole("button", { name: "Berhenti" }).click();
+  await page.getByRole("button", { name: "Simpan", exact: true }).click();
+  await page.getByRole("button", { name: "Rekam", exact: true }).waitFor({ timeout: 10_000 });
+}
+
 console.log("review: play, pause, resume, approve");
 await page.getByRole("tab", { name: "Dengarkan" }).click();
 const card = page.locator("section", {
@@ -111,6 +120,12 @@ await card.getByRole("button", { name: "Jeda", exact: true }).waitFor({ timeout:
 await shot("06-playing");
 await page.getByRole("button", { name: "Ya", exact: true }).click();
 await page.getByText("Klip disetujui").waitFor({ timeout: 10_000 });
+
+console.log("review: approve the other pending clips at once");
+await page.getByRole("button", { name: "Ya semua (2)", exact: true }).click();
+await page.getByRole("button", { name: "Setujui semua", exact: true }).click();
+await page.getByText("2 klip disetujui").waitFor({ timeout: 10_000 });
+await page.getByText("Tidak ada klip di daftar ini.").waitFor({ timeout: 5_000 });
 
 console.log("clip list: filter, search, pagination");
 await page.getByRole("tab", { name: "Disetujui" }).click();

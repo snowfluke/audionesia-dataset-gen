@@ -142,14 +142,14 @@ audionesia-dataset-gen/
 
 **Clip status machine** (`src/lib/db/schema.ts`):
 
-| From       | To         | Actor              | Guard                       |
-| ---------- | ---------- | ------------------ | --------------------------- |
-| (take)     | `pending`  | `saveClip`         | PCM trimmed, duration known |
-| `pending`  | `approved` | reviewer (`Ya`)    | none                        |
-| `pending`  | `rejected` | reviewer (`Tidak`) | none                        |
-| `approved` | `rejected` | reviewer           | none                        |
-| `rejected` | `approved` | reviewer           | audio row still exists      |
-| any        | (deleted)  | `deleteClip`       | audio row deleted with it   |
+| From       | To         | Actor                       | Guard                       |
+| ---------- | ---------- | --------------------------- | --------------------------- |
+| (take)     | `pending`  | `saveClip`                  | PCM trimmed, duration known |
+| `pending`  | `approved` | reviewer (`Ya`, `Ya semua`) | none                        |
+| `pending`  | `rejected` | reviewer (`Tidak`)          | none                        |
+| `approved` | `rejected` | reviewer                    | none                        |
+| `rejected` | `approved` | reviewer                    | audio row still exists      |
+| any        | (deleted)  | `deleteClip`                | audio row deleted with it   |
 
 Terminal for export: `approved` exports, `rejected` never does. `setClipStatus` enforces the guard. Script status per workspace is derived from clips and skips, never stored.
 

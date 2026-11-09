@@ -106,6 +106,21 @@ export async function setClipStatus(id: string, status: ClipStatus): Promise<voi
   await Promise.all([tx.objectStore("clips").put({ ...clip, status, reviewedAt }), tx.done]);
 }
 
+/**
+ * Approves every pending clip of a workspace in one transaction and returns how
+ * many changed. `pending -> approved` has no guard, so no audio check is needed.
+ */
+export async function approvePendingClips(workspaceId: string): Promise<number> {
+  const tx = (await db()).transaction("clips", "readwrite");
+  const pending = await tx.store.index("by-workspace-status").getAll([workspaceId, "pending"]);
+  const reviewedAt = new Date().toISOString();
+  await Promise.all([
+    ...pending.map((clip) => tx.store.put({ ...clip, status: "approved", reviewedAt })),
+    tx.done,
+  ]);
+  return pending.length;
+}
+
 /** Removes the clip and its audio together. */
 export async function deleteClip(id: string): Promise<void> {
   const tx = (await db()).transaction(["clips", "audio"], "readwrite");

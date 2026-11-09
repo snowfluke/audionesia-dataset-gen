@@ -8,6 +8,7 @@ import type { Playback } from "../../lib/audio/playback.ts";
 import { playWav } from "../../lib/audio/playback.ts";
 import { decodeWav } from "../../lib/audio/wav-encode.ts";
 import {
+  approvePendingClips,
   deleteClip,
   getClipAudio,
   listClipsByWorkspace,
@@ -42,6 +43,8 @@ export type ReviewStore = {
   playRow: (clip: Clip) => Promise<void>;
   batchDone: () => number;
   decide: (status: ClipStatus) => Promise<void>;
+  /** Approves every pending clip of the workspace, for a speaker who listened to each take in Rekam. */
+  approveAllPending: () => Promise<void>;
   /** Marks the clip rejected so its script returns to the Rekam queue. */
   requeue: () => Promise<void>;
   remove: () => Promise<void>;
@@ -123,6 +126,15 @@ export function createReviewStore(): ReviewStore {
     );
   }
 
+  async function approveAllPending(): Promise<void> {
+    const workspace = currentWorkspace();
+    if (workspace === null) return;
+    player.stop();
+    const approved = await approvePendingClips(workspace.id);
+    bumpClips();
+    showToast(`${approved} klip disetujui`, "success");
+  }
+
   async function requeue(): Promise<void> {
     const clip = current();
     if (clip === undefined) return;
@@ -186,6 +198,7 @@ export function createReviewStore(): ReviewStore {
     playRow,
     batchDone,
     decide,
+    approveAllPending,
     requeue,
     remove,
     asrProgress,

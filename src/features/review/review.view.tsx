@@ -17,6 +17,8 @@ import { REVIEW_KEYS, createReviewStore } from "./review.store.ts";
 export default function ReviewView(): JSX.Element {
   const store = createReviewStore();
   const [confirmDelete, setConfirmDelete] = createSignal(false);
+  const [confirmApproveAll, setConfirmApproveAll] = createSignal(false);
+  const pendingCount = (): number => store.list.counts().pending;
 
   return (
     <div class="flex flex-col gap-8">
@@ -87,6 +89,11 @@ export default function ReviewView(): JSX.Element {
                     Tidak
                   </Button>
                 </Show>
+                <Show when={clip().status === "pending" && pendingCount() > 1}>
+                  <Button variant="outline" size="lg" onClick={() => setConfirmApproveAll(true)}>
+                    Ya semua ({pendingCount()})
+                  </Button>
+                </Show>
                 <Show when={clip().status === "approved"}>
                   <Button variant="outline" onClick={() => void attempt(store.requeue)}>
                     Rekam ulang naskah
@@ -129,6 +136,29 @@ export default function ReviewView(): JSX.Element {
             }
           >
             Hapus
+          </Button>
+        </div>
+      </Dialog>
+      <Dialog
+        open={confirmApproveAll()}
+        onClose={() => setConfirmApproveAll(false)}
+        title={`Setujui ${pendingCount()} klip?`}
+        description="Semua klip yang menunggu masuk ke ekspor tanpa didengarkan lagi di sini. Klip yang salah tetap bisa ditolak satu per satu di daftar Disetujui."
+      >
+        <div class="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setConfirmApproveAll(false)}>
+            Batal
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() =>
+              void attempt(async () => {
+                await store.approveAllPending();
+                setConfirmApproveAll(false);
+              })
+            }
+          >
+            Setujui semua
           </Button>
         </div>
       </Dialog>
