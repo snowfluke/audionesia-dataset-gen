@@ -206,7 +206,9 @@ export function createRecordStore(): RecordStore {
   async function play(): Promise<void> {
     const taken = take();
     if (taken === null) return;
-    await player.toggle(() => playSamples(taken.samples, taken.sampleRate));
+    await player.toggle(() =>
+      playSamples(taken.samples, taken.sampleRate, settings().normalizePeakDbfs)
+    );
   }
 
   function toggle(): void {

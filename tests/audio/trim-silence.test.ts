@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { amplitudeToDbfs, isClipped, peakDbfs } from "../../src/lib/audio/level.ts";
-import { normalizePeak, removeDcOffset } from "../../src/lib/audio/normalize.ts";
+import { normalizePeak, removeDcOffset, toExportLevel } from "../../src/lib/audio/normalize.ts";
 import { analyzeTake, trimSilence } from "../../src/lib/audio/trim-silence.ts";
 
 const SAMPLE_RATE = 1000;
@@ -78,5 +78,20 @@ describe("level helpers", () => {
     expect(amplitudeToDbfs(0)).toBe(Number.NEGATIVE_INFINITY);
     expect(isClipped(tone(10, 0.995))).toBe(true);
     expect(isClipped(tone(10, 0.9))).toBe(false);
+  });
+});
+
+describe("toExportLevel", () => {
+  it("centres a quiet take and lifts its peak to the target", () => {
+    const quiet = tone(100, 0.06).map((sample) => sample + 0.01);
+    const leveled = toExportLevel(quiet, -3);
+    expect(peakDbfs(leveled)).toBeCloseTo(-3, 5);
+    expect(leveled.reduce((sum, sample) => sum + sample, 0) / leveled.length).toBeCloseTo(0, 6);
+  });
+
+  it("keeps the level and only centres when the target is null", () => {
+    const quiet = tone(100, 0.06).map((sample) => sample + 0.01);
+    const leveled = toExportLevel(quiet, null);
+    expect(peakDbfs(leveled)).toBeCloseTo(amplitudeToDbfs(0.06), 5);
   });
 });

@@ -1,6 +1,6 @@
 import { normalizeText } from "indo-g2p/core";
 
-import { normalizePeak, removeDcOffset } from "../audio/normalize.ts";
+import { toExportLevel } from "../audio/normalize.ts";
 import { resample } from "../audio/resample.ts";
 import { decodeWav, encodeWav } from "../audio/wav-encode.ts";
 import { getClipAudio } from "../db/clip.repository.ts";
@@ -41,10 +41,8 @@ export async function exportClip(
       warning: `${relativePath} hanya ${masterSeconds.toFixed(2)} s, di bawah batas ${options.minClipSec} s, dilewati`,
     };
   }
-  let samples = removeDcOffset(master.samples);
-  if (options.normalizePeakDbfs !== null)
-    samples = normalizePeak(samples, options.normalizePeakDbfs);
-  samples = await resample(samples, master.sampleRate, options.sampleRate);
+  const leveled = toExportLevel(master.samples, options.normalizePeakDbfs);
+  const samples = await resample(leveled, master.sampleRate, options.sampleRate);
   const wav = encodeWav(samples, options.sampleRate);
   await options.writer.file(`${DATASET_ROOT}/${relativePath}`, wav);
   return {

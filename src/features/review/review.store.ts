@@ -80,7 +80,7 @@ export function createReviewStore(): ReviewStore {
     return async () => {
       const blob = await getClipAudio(clip.id);
       if (blob === undefined) throw new Error("Audio klip ini sudah dibebaskan");
-      return playWav(blob);
+      return playWav(blob, settings().normalizePeakDbfs);
     };
   }
 

@@ -1,3 +1,4 @@
+import { toExportLevel } from "./normalize.ts";
 import { decodeWav } from "./wav-encode.ts";
 
 /** One playback of a buffer that can be paused and resumed at the same position. */
@@ -18,21 +19,22 @@ function context(): AudioContext {
   return shared;
 }
 
-/** Plays a master WAV blob written by this app. */
-export async function playWav(blob: Blob): Promise<Playback> {
+/** Plays a master WAV blob written by this app, at the export level `peakDbfs`. */
+export async function playWav(blob: Blob, peakDbfs: number | null): Promise<Playback> {
   const decoded = decodeWav(new Uint8Array(await blob.arrayBuffer()));
-  return playSamples(decoded.samples, decoded.sampleRate);
+  return playSamples(decoded.samples, decoded.sampleRate, peakDbfs);
 }
 
-/** Plays raw mono samples, for a take that is not saved yet. */
+/** Plays mono samples at the export level `peakDbfs`, for a take that is not saved yet. */
 export async function playSamples(
   samples: Float32Array<ArrayBuffer>,
-  sampleRate: number
+  sampleRate: number,
+  peakDbfs: number | null
 ): Promise<Playback> {
   const audio = context();
   if (audio.state === "suspended") await audio.resume();
   const buffer = audio.createBuffer(1, Math.max(1, samples.length), sampleRate);
-  buffer.copyToChannel(samples, 0);
+  buffer.copyToChannel(toExportLevel(samples, peakDbfs), 0);
 
   let source: AudioBufferSourceNode | null = null;
   let offset = 0;

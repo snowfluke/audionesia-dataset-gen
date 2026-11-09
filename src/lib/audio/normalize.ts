@@ -11,6 +11,18 @@ export function removeDcOffset(samples: Float32Array<ArrayBuffer>): Float32Array
   return out;
 }
 
+/**
+ * The level the dataset ships at: DC offset removed, then the peak moved to `peakDbfs`
+ * (`null` keeps the master level). Playback uses it too, so a reviewer hears the exported clip.
+ */
+export function toExportLevel(
+  samples: Float32Array<ArrayBuffer>,
+  peakDbfs: number | null
+): Float32Array<ArrayBuffer> {
+  const centered = removeDcOffset(samples);
+  return peakDbfs === null ? centered : normalizePeak(centered, peakDbfs);
+}
+
 /** Scales the take so its peak sits at `targetDbfs`. Silence is returned unchanged. */
 export function normalizePeak(
   samples: Float32Array<ArrayBuffer>,
