@@ -12,7 +12,7 @@ import Waveform from "../../components/waveform.tsx";
 import { amplitudeToDbfs } from "../../lib/audio/level.ts";
 import { formatCount, formatSeconds } from "../../lib/format.ts";
 import { settings } from "../settings/settings.store.ts";
-import { setTab } from "../workspaces/navigation.store.ts";
+import { focusMode, setFocusMode, setTab } from "../workspaces/navigation.store.ts";
 import BatchDots from "./batch-dots.tsx";
 import { RECORD_KEYS, createRecordStore } from "./record.store.ts";
 
@@ -78,30 +78,30 @@ export default function RecordView(): JSX.Element {
         >
           {(script) => (
             <LayerCard class="flex flex-col gap-4">
-              <div class="flex items-center justify-between gap-3 text-xs text-kumo-subtle">
-                <span>
-                  Perkiraan {formatSeconds(store.estimate(script()))} · {script().syllables} suku
-                  kata · {formatCount(store.queue().length)} naskah tersisa
-                </span>
-                <Badge variant={outsideWindow(store.estimate(script())) ? "warning" : "secondary"}>
-                  Target {settings().targetMinSec}–{settings().targetMaxSec} s
-                </Badge>
-              </div>
-              <p class="text-2xl leading-relaxed text-kumo-strong">{script().text}</p>
+              <Show when={!focusMode()}>
+                <div class="flex items-center justify-between gap-3 text-xs text-kumo-subtle">
+                  <span>
+                    Perkiraan {formatSeconds(store.estimate(script()))} · {script().syllables} suku
+                    kata · {formatCount(store.queue().length)} naskah tersisa
+                  </span>
+                  <Badge
+                    variant={outsideWindow(store.estimate(script())) ? "warning" : "secondary"}
+                  >
+                    Target {settings().targetMinSec}–{settings().targetMaxSec} s
+                  </Badge>
+                </div>
+              </Show>
+              <p
+                class={[
+                  "leading-relaxed text-kumo-strong",
+                  { "text-2xl": !focusMode(), "text-3xl": focusMode() },
+                ]}
+              >
+                {script().text}
+              </p>
               <Show when={settings().showPhonemes}>
                 <p class="font-mono text-base text-kumo-subtle">{script().phonemes}</p>
               </Show>
-              <p class="text-xs text-kumo-subtle">
-                Ingin membaca teks Anda sendiri?{" "}
-                <button
-                  type="button"
-                  class="text-kumo-link hover:underline"
-                  onClick={() => setTab("write")}
-                >
-                  Tambahkan di tab Teks sendiri
-                </button>
-                ; naskahnya masuk ke urutan pertama antrean ini.
-              </p>
             </LayerCard>
           )}
         </Show>
@@ -117,15 +117,17 @@ export default function RecordView(): JSX.Element {
               tone={store.level().peak >= CLIP_PEAK ? "danger" : "default"}
             />
           </div>
-          <label class="flex flex-col gap-1 text-xs text-kumo-subtle">
-            Mikrofon
-            <Select
-              size="sm"
-              options={deviceOptions()}
-              value={settings().inputDeviceId}
-              onChange={(id) => void attempt(() => store.selectDevice(id))}
-            />
-          </label>
+          <Show when={!focusMode()}>
+            <label class="flex flex-col gap-1 text-xs text-kumo-subtle">
+              Mikrofon
+              <Select
+                size="sm"
+                options={deviceOptions()}
+                value={settings().inputDeviceId}
+                onChange={(id) => void attempt(() => store.selectDevice(id))}
+              />
+            </label>
+          </Show>
         </div>
         <Show when={store.take()}>
           {(take) => (
@@ -194,6 +196,13 @@ export default function RecordView(): JSX.Element {
             Lewati
           </Button>
           <BatchDots done={store.batchDone()} size={settings().batchSize} />
+          <Button
+            variant="ghost"
+            shortcut={focusMode() ? RECORD_KEYS.exitFocus : RECORD_KEYS.focus}
+            onClick={() => setFocusMode(!focusMode())}
+          >
+            {focusMode() ? "Keluar mode fokus" : "Mode fokus"}
+          </Button>
         </div>
       </section>
     </div>

@@ -14,7 +14,7 @@ import ReviewView from "./features/review/review.view.tsx";
 import { initSettings } from "./features/settings/settings.store.ts";
 import SettingsView from "./features/settings/settings.view.tsx";
 import HomeView from "./features/workspaces/home.view.tsx";
-import { TABS, setTab, tab } from "./features/workspaces/navigation.store.ts";
+import { TABS, focusMode, setTab, tab } from "./features/workspaces/navigation.store.ts";
 import {
   closeWorkspace,
   currentWorkspace,
@@ -30,6 +30,7 @@ export default function App(): JSX.Element {
   const initialTheme = currentTheme();
   const [theme, setTheme] = createSignal(initialTheme);
   const [help, setHelp] = createSignal<HelpTopic>("none");
+  const focused = (): boolean => focusMode() && currentWorkspace() !== null && tab() === "record";
 
   applyTheme(initialTheme);
   void attempt(async () => {
@@ -40,69 +41,78 @@ export default function App(): JSX.Element {
 
   return (
     <div class="flex min-h-screen flex-col bg-kumo-canvas text-base text-kumo-default">
-      <header class="flex flex-wrap items-center gap-4 border-b border-kumo-line bg-kumo-base px-6 py-3">
-        <button type="button" class="flex flex-col text-left" onClick={closeWorkspace}>
-          <span class="text-lg font-semibold text-kumo-strong">Audionesia Dataset Generator</span>
-          <span class="text-xs text-kumo-subtle">
-            Pembuat dataset suara untuk TTS bahasa Indonesia
-          </span>
-        </button>
-        <Show when={currentWorkspace()}>
-          {(workspace) => (
-            <nav aria-label="Lokasi" class="flex flex-wrap items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={closeWorkspace}>
-                ← Semua dataset
-              </Button>
-              <span class="text-kumo-subtle">/</span>
-              <span class="font-medium text-kumo-strong">{workspace().name}</span>
-            </nav>
-          )}
-        </Show>
-        <div class="ml-auto flex items-center gap-2">
-          <a
-            href={REPO_URL}
-            target="_blank"
-            rel="noreferrer"
-            class="inline-flex h-8 items-center gap-1 rounded-md px-2 text-base text-kumo-default hover:bg-kumo-fill"
-          >
-            GitHub ↗
-          </a>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              const next = nextTheme(theme());
-              setTheme(next);
-              applyTheme(next);
-            }}
-          >
-            Tema: {THEME_LABELS[theme()]}
-          </Button>
-        </div>
-      </header>
-
-      <Show when={currentWorkspace() !== null || phase() !== "ready"}>
-        <nav class="flex items-center gap-4 border-b border-kumo-line bg-kumo-base px-6 py-2">
-          <Show when={currentWorkspace() !== null}>
-            <Tabs items={TABS} value={tab()} onChange={setTab} label="Bagian" />
-          </Show>
-          <Show when={phase() !== "ready"}>
-            <span
-              class={[
-                "text-xs",
-                {
-                  "text-kumo-danger": phase() === "error",
-                  "text-kumo-subtle": phase() !== "error",
-                },
-              ]}
-            >
-              {progress()}
+      <Show when={!focused()}>
+        <header class="flex flex-wrap items-center gap-4 border-b border-kumo-line bg-kumo-base px-6 py-3">
+          <button type="button" class="flex flex-col text-left" onClick={closeWorkspace}>
+            <span class="text-lg font-semibold text-kumo-strong">Audionesia Dataset Generator</span>
+            <span class="text-xs text-kumo-subtle">
+              Pembuat dataset suara untuk TTS bahasa Indonesia
             </span>
+          </button>
+          <Show when={currentWorkspace()}>
+            {(workspace) => (
+              <nav aria-label="Lokasi" class="flex flex-wrap items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={closeWorkspace}>
+                  ← Semua dataset
+                </Button>
+                <span class="text-kumo-subtle">/</span>
+                <span class="font-medium text-kumo-strong">{workspace().name}</span>
+              </nav>
+            )}
           </Show>
-        </nav>
+          <div class="ml-auto flex items-center gap-2">
+            <a
+              href={REPO_URL}
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex h-8 items-center gap-1 rounded-md px-2 text-base text-kumo-default hover:bg-kumo-fill"
+            >
+              GitHub ↗
+            </a>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const next = nextTheme(theme());
+                setTheme(next);
+                applyTheme(next);
+              }}
+            >
+              Tema: {THEME_LABELS[theme()]}
+            </Button>
+          </div>
+        </header>
       </Show>
 
-      <main class="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4 px-6 py-6">
+      <Show when={!focused()}>
+        <Show when={currentWorkspace() !== null || phase() !== "ready"}>
+          <nav class="flex items-center gap-4 border-b border-kumo-line bg-kumo-base px-6 py-2">
+            <Show when={currentWorkspace() !== null}>
+              <Tabs items={TABS} value={tab()} onChange={setTab} label="Bagian" />
+            </Show>
+            <Show when={phase() !== "ready"}>
+              <span
+                class={[
+                  "text-xs",
+                  {
+                    "text-kumo-danger": phase() === "error",
+                    "text-kumo-subtle": phase() !== "error",
+                  },
+                ]}
+              >
+                {progress()}
+              </span>
+            </Show>
+          </nav>
+        </Show>
+      </Show>
+
+      <main
+        class={[
+          "mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4 px-6",
+          { "py-6": !focused(), "py-16": focused() },
+        ]}
+      >
         <Errored
           fallback={(error, reset) => (
             <Banner variant="error">
@@ -135,14 +145,16 @@ export default function App(): JSX.Element {
         </Errored>
       </main>
 
-      <footer class="flex items-center gap-2 border-t border-kumo-line bg-kumo-base px-6 py-3">
-        <Button variant="ghost" size="sm" onClick={() => setHelp("guide")}>
-          Panduan
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => setHelp("shortcuts")}>
-          Pintasan keyboard
-        </Button>
-      </footer>
+      <Show when={!focused()}>
+        <footer class="flex items-center gap-2 border-t border-kumo-line bg-kumo-base px-6 py-3">
+          <Button variant="ghost" size="sm" onClick={() => setHelp("guide")}>
+            Panduan
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setHelp("shortcuts")}>
+            Pintasan keyboard
+          </Button>
+        </footer>
+      </Show>
 
       <HelpDialogs topic={help()} onClose={() => setHelp("none")} />
       <Toaster />

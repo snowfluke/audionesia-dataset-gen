@@ -13,9 +13,10 @@ import type { ScriptRow } from "../../lib/db/schema.ts";
 import { listScripts } from "../../lib/db/script.repository.ts";
 import { listSkippedScriptIds, skipScript } from "../../lib/db/skip.repository.ts";
 import { estimateSeconds } from "../../lib/duration.ts";
-import { ENTER, SPACE, letterKey, registerShortcuts } from "../../lib/shortcuts.ts";
+import { ENTER, ESCAPE, SPACE, letterKey, registerShortcuts } from "../../lib/shortcuts.ts";
 import { bumpClips, clipsVersion, scriptsVersion } from "../library/library.store.ts";
 import { settings, updateSettings } from "../settings/settings.store.ts";
+import { focusMode, setFocusMode } from "../workspaces/navigation.store.ts";
 import { currentWorkspace } from "../workspaces/workspaces.store.ts";
 import { createCapture } from "./record.capture.ts";
 import type { InputDevice, Level } from "./recorder.ts";
@@ -38,6 +39,8 @@ export const RECORD_KEYS = {
   retake: letterKey("r"),
   skip: letterKey("s"),
   play: letterKey("p"),
+  focus: letterKey("f"),
+  exitFocus: ESCAPE,
 } as const;
 
 export type RecordStore = {
@@ -247,10 +250,13 @@ export function createRecordStore(): RecordStore {
       [RECORD_KEYS.retake.key, retake],
       [RECORD_KEYS.skip.key, () => void attempt(skip)],
       [RECORD_KEYS.play.key, () => void attempt(play)],
+      [RECORD_KEYS.focus.key, () => setFocusMode(!focusMode())],
+      [RECORD_KEYS.exitFocus.key, () => setFocusMode(false)],
     ])
   );
   // oxlint-enable solid/reactivity
   onCleanup(() => {
+    setFocusMode(false);
     unregister();
     if (stopTimer !== null) clearTimeout(stopTimer);
     player.stop();

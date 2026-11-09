@@ -64,6 +64,13 @@ await page.getByRole("switch", { name: /terpotong/ }).click();
 await page.getByRole("tab", { name: "Rekam" }).click();
 await page.locator("p.text-2xl").first().waitFor({ timeout: 60_000 });
 
+console.log("focus mode hides the app chrome; Esc brings it back");
+await page.getByRole("button", { name: "Mode fokus", exact: true }).click();
+await page.getByRole("tablist").waitFor({ state: "detached", timeout: 2_000 });
+await shot("03-focus");
+await page.keyboard.press("Escape");
+await page.getByRole("tablist").waitFor({ timeout: 2_000 });
+
 console.log("record");
 await page.getByRole("button", { name: "Nyalakan mikrofon" }).click();
 await page.getByRole("button", { name: "Rekam", exact: true }).waitFor({ timeout: 15_000 });

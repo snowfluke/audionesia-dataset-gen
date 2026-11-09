@@ -6,6 +6,7 @@ export type Shortcut = { key: string; aria: string; label: string };
 
 export const SPACE: Shortcut = { key: " ", aria: "Space", label: "Spasi" };
 export const ENTER: Shortcut = { key: "Enter", aria: "Enter", label: "Enter" };
+export const ESCAPE: Shortcut = { key: "Escape", aria: "Escape", label: "Esc" };
 
 export function letterKey(letter: string): Shortcut {
   return { key: letter.toLowerCase(), aria: letter.toUpperCase(), label: letter.toUpperCase() };
