@@ -1,6 +1,16 @@
 /** Keys as `KeyboardEvent.key`; " " is the space bar. */
 export type ShortcutMap = ReadonlyMap<string, () => void>;
 
+/** One key: what `registerShortcuts` matches, what `aria-keyshortcuts` announces, what the keycap shows. */
+export type Shortcut = { key: string; aria: string; label: string };
+
+export const SPACE: Shortcut = { key: " ", aria: "Space", label: "Spasi" };
+export const ENTER: Shortcut = { key: "Enter", aria: "Enter", label: "Enter" };
+
+export function letterKey(letter: string): Shortcut {
+  return { key: letter.toLowerCase(), aria: letter.toUpperCase(), label: letter.toUpperCase() };
+}
+
 const TEXT_INPUT_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
 
 function isTyping(target: EventTarget | null): boolean {

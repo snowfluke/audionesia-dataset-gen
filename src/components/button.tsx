@@ -1,5 +1,8 @@
 import type { ComponentProps, JSX } from "@solidjs/web";
-import { merge, omit } from "solid-js";
+import { Show, merge, omit } from "solid-js";
+
+import type { Shortcut } from "../lib/shortcuts.ts";
+import Kbd from "./kbd.tsx";
 
 // Variant and size strings come from the Kumo registry entry "Button".
 const BASE =
@@ -31,6 +34,8 @@ export type ButtonSize = keyof typeof SIZES;
 export type ButtonProps = ComponentProps<"button"> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  /** Shows the keycap and sets `aria-keyshortcuts`, so the accessible name stays the label alone. */
+  shortcut?: Shortcut;
 };
 
 /** Button classes for an element that cannot be a `<button>`, such as a file-picker label. */
@@ -40,10 +45,15 @@ export function buttonClass(variant: ButtonVariant, size: ButtonSize): string[] 
 
 export default function Button(props: ButtonProps): JSX.Element {
   const local = merge({ variant: "secondary", size: "base", type: "button" } as const, props);
-  const rest = omit(local, "variant", "size", "class", "children");
+  const rest = omit(local, "variant", "size", "class", "children", "shortcut");
   return (
-    <button {...rest} class={[...buttonClass(local.variant, local.size), local.class]}>
+    <button
+      {...rest}
+      aria-keyshortcuts={local.shortcut?.aria}
+      class={[...buttonClass(local.variant, local.size), local.class]}
+    >
       {local.children}
+      <Show when={local.shortcut}>{(shortcut) => <Kbd tone="button">{shortcut().label}</Kbd>}</Show>
     </button>
   );
 }

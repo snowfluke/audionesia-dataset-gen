@@ -14,12 +14,19 @@ import {
   setClipStatus,
 } from "../../lib/db/clip.repository.ts";
 import type { Clip, ClipStatus } from "../../lib/db/schema.ts";
-import { registerShortcuts } from "../../lib/shortcuts.ts";
+import { SPACE, letterKey, registerShortcuts } from "../../lib/shortcuts.ts";
 import { bumpClips, clipsVersion } from "../library/library.store.ts";
 import { settings } from "../settings/settings.store.ts";
 import { currentWorkspace } from "../workspaces/workspaces.store.ts";
 import type { ClipList } from "./review.list.ts";
 import { createClipList } from "./review.list.ts";
+
+/** The Dengarkan tab's keys; the store registers them and the view shows them on the buttons. */
+export const REVIEW_KEYS = {
+  play: SPACE,
+  approve: letterKey("y"),
+  reject: letterKey("n"),
+} as const;
 
 export type ReviewStore = {
   list: ClipList;
@@ -158,9 +165,9 @@ export function createReviewStore(): ReviewStore {
   // oxlint-disable solid/reactivity -- keydown handlers run outside Solid tracking on purpose
   const unregister = registerShortcuts(
     new Map([
-      [" ", () => void attempt(togglePlay)],
-      ["y", () => void attempt(() => decide("approved"))],
-      ["n", () => void attempt(() => decide("rejected"))],
+      [REVIEW_KEYS.play.key, () => void attempt(togglePlay)],
+      [REVIEW_KEYS.approve.key, () => void attempt(() => decide("approved"))],
+      [REVIEW_KEYS.reject.key, () => void attempt(() => decide("rejected"))],
     ])
   );
   // oxlint-enable solid/reactivity

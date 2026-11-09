@@ -13,7 +13,7 @@ import type { ScriptRow } from "../../lib/db/schema.ts";
 import { listScripts } from "../../lib/db/script.repository.ts";
 import { listSkippedScriptIds, skipScript } from "../../lib/db/skip.repository.ts";
 import { estimateSeconds } from "../../lib/duration.ts";
-import { registerShortcuts } from "../../lib/shortcuts.ts";
+import { ENTER, SPACE, letterKey, registerShortcuts } from "../../lib/shortcuts.ts";
 import { bumpClips, clipsVersion, scriptsVersion } from "../library/library.store.ts";
 import { settings, updateSettings } from "../settings/settings.store.ts";
 import { currentWorkspace } from "../workspaces/workspaces.store.ts";
@@ -30,6 +30,15 @@ export type Take = {
   clipped: boolean;
   snrDb: number | null;
 };
+
+/** The Rekam tab's keys; the store registers them and the view shows them on the buttons. */
+export const RECORD_KEYS = {
+  toggle: SPACE,
+  save: ENTER,
+  retake: letterKey("r"),
+  skip: letterKey("s"),
+  play: letterKey("p"),
+} as const;
 
 export type RecordStore = {
   queue: () => ScriptRow[];
@@ -124,15 +133,18 @@ export function createRecordStore(): RecordStore {
       thresholdDbfs: current.silenceThresholdDbfs,
       paddingMs: current.silencePaddingMs,
     });
-    setTake({
+    const taken: Take = {
       samples: analysis.samples,
       sampleRate: raw.sampleRate,
       durationSec: analysis.samples.length / raw.sampleRate,
       peakDbfs: peakDbfs(analysis.samples),
       clipped: isClipped(analysis.samples),
       snrDb: analysis.snrDb,
-    });
+    };
+    setTake(taken);
     setBusy("review");
+    // The take plays back at once so the speaker hears it before deciding; `take()` still holds the old value until the flush.
+    if (taken.samples.length > 0) void attempt(() => playTake(taken));
     if (analysis.snrDb !== null && analysis.snrDb < current.minSnrDb) {
       showToast(
         `Rasio sinyal terhadap derau hanya ${analysis.snrDb.toFixed(0)} dB; cari ruangan yang lebih sunyi.`,
@@ -143,6 +155,11 @@ export function createRecordStore(): RecordStore {
 
   function start(): void {
     if (phase() !== "ready") return;
+    beginTake();
+  }
+
+  /** Starts capturing without checking `phase()`, which lags a write until the flush. */
+  function beginTake(): void {
     player.stop();
     if (!capture.start()) return;
     stopTimer = setTimeout(() => {
@@ -188,11 +205,12 @@ export function createRecordStore(): RecordStore {
     showToast(done === size ? `Batch ${size} klip selesai` : "Klip tersimpan", "success");
   }
 
+  /** Discards the take and records the same script again in one step. */
   function retake(): void {
     if (phase() !== "review") return;
-    player.stop();
     setTake(null);
     setBusy(null);
+    beginTake();
   }
 
   async function skip(): Promise<void> {
@@ -203,12 +221,16 @@ export function createRecordStore(): RecordStore {
     setRefresh((n) => n + 1);
   }
 
+  function playTake(taken: Take): Promise<void> {
+    return player.toggle(() =>
+      playSamples(taken.samples, taken.sampleRate, settings().normalizePeakDbfs)
+    );
+  }
+
   async function play(): Promise<void> {
     const taken = take();
     if (taken === null) return;
-    await player.toggle(() =>
-      playSamples(taken.samples, taken.sampleRate, settings().normalizePeakDbfs)
-    );
+    await playTake(taken);
   }
 
   function toggle(): void {
@@ -220,11 +242,11 @@ export function createRecordStore(): RecordStore {
   // oxlint-disable solid/reactivity -- keydown handlers run outside Solid tracking on purpose
   const unregister = registerShortcuts(
     new Map([
-      [" ", toggle],
-      ["Enter", () => void attempt(save)],
-      ["r", retake],
-      ["s", () => void attempt(skip)],
-      ["p", () => void attempt(play)],
+      [RECORD_KEYS.toggle.key, toggle],
+      [RECORD_KEYS.save.key, () => void attempt(save)],
+      [RECORD_KEYS.retake.key, retake],
+      [RECORD_KEYS.skip.key, () => void attempt(skip)],
+      [RECORD_KEYS.play.key, () => void attempt(play)],
     ])
   );
   // oxlint-enable solid/reactivity

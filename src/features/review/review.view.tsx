@@ -4,7 +4,6 @@ import { Loading, Show, createSignal } from "solid-js";
 import Badge from "../../components/badge.tsx";
 import Button from "../../components/button.tsx";
 import Dialog from "../../components/dialog.tsx";
-import Kbd from "../../components/kbd.tsx";
 import LayerCard from "../../components/layer-card.tsx";
 import { attempt } from "../../components/toast.tsx";
 import Waveform from "../../components/waveform.tsx";
@@ -13,7 +12,7 @@ import BatchDots from "../record/batch-dots.tsx";
 import { settings } from "../settings/settings.store.ts";
 import ClipTable from "./clip-table.tsx";
 import { clipFileName } from "./review.list.ts";
-import { createReviewStore } from "./review.store.ts";
+import { REVIEW_KEYS, createReviewStore } from "./review.store.ts";
 
 export default function ReviewView(): JSX.Element {
   const store = createReviewStore();
@@ -62,6 +61,7 @@ export default function ReviewView(): JSX.Element {
               <div class="flex flex-wrap items-center gap-2">
                 <Button
                   variant={clip().status === "approved" ? "primary" : "outline"}
+                  shortcut={REVIEW_KEYS.play}
                   size="lg"
                   onClick={() => void attempt(store.togglePlay)}
                 >
@@ -71,6 +71,7 @@ export default function ReviewView(): JSX.Element {
                   <Button
                     variant="primary"
                     size="lg"
+                    shortcut={REVIEW_KEYS.approve}
                     onClick={() => void attempt(() => store.decide("approved"))}
                   >
                     Ya
@@ -80,6 +81,7 @@ export default function ReviewView(): JSX.Element {
                   <Button
                     size="lg"
                     variant="outline"
+                    shortcut={REVIEW_KEYS.reject}
                     onClick={() => void attempt(() => store.decide("rejected"))}
                   >
                     Tidak
@@ -102,10 +104,6 @@ export default function ReviewView(): JSX.Element {
                 </Button>
                 <BatchDots done={store.batchDone()} size={settings().batchSize} />
               </div>
-              <p class="text-xs text-kumo-subtle">
-                <Kbd>Spasi</Kbd> putar / jeda · <Kbd>Y</Kbd> setujui · <Kbd>N</Kbd> tolak. Pilih
-                klip lain dari daftar di bawah.
-              </p>
             </LayerCard>
           )}
         </Show>

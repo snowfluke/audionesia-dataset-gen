@@ -4,7 +4,6 @@ import { Loading, Show, createMemo } from "solid-js";
 import Badge from "../../components/badge.tsx";
 import Banner from "../../components/banner.tsx";
 import Button from "../../components/button.tsx";
-import Kbd from "../../components/kbd.tsx";
 import LayerCard from "../../components/layer-card.tsx";
 import Meter from "../../components/meter.tsx";
 import Select from "../../components/select.tsx";
@@ -15,7 +14,7 @@ import { formatCount, formatSeconds } from "../../lib/format.ts";
 import { settings } from "../settings/settings.store.ts";
 import { setTab } from "../workspaces/navigation.store.ts";
 import BatchDots from "./batch-dots.tsx";
-import { createRecordStore } from "./record.store.ts";
+import { RECORD_KEYS, createRecordStore } from "./record.store.ts";
 
 const METER_FLOOR_DBFS = -60;
 const CLIP_PEAK = 0.99;
@@ -161,6 +160,7 @@ export default function RecordView(): JSX.Element {
         <div class="flex flex-wrap items-center gap-2">
           <Button
             variant={mainVariant()}
+            shortcut={store.phase() === "review" ? RECORD_KEYS.retake : RECORD_KEYS.toggle}
             size="lg"
             disabled={store.phase() === "arming" || store.phase() === "saving"}
             onClick={onMainButton}
@@ -172,16 +172,22 @@ export default function RecordView(): JSX.Element {
               variant="primary"
               size="lg"
               disabled={store.saveBlocker() !== null}
+              shortcut={RECORD_KEYS.save}
               onClick={() => void attempt(store.save)}
             >
               Simpan
             </Button>
-            <Button variant="outline" onClick={() => void attempt(store.play)}>
+            <Button
+              variant="outline"
+              shortcut={RECORD_KEYS.play}
+              onClick={() => void attempt(store.play)}
+            >
               {store.playState() === "playing" ? "Jeda" : "Putar"}
             </Button>
           </Show>
           <Button
             variant="ghost"
+            shortcut={RECORD_KEYS.skip}
             onClick={() => void attempt(store.skip)}
             disabled={store.phase() === "recording"}
           >
@@ -189,10 +195,6 @@ export default function RecordView(): JSX.Element {
           </Button>
           <BatchDots done={store.batchDone()} size={settings().batchSize} />
         </div>
-        <p class="text-xs text-kumo-subtle">
-          <Kbd>Spasi</Kbd> rekam / berhenti · <Kbd>Enter</Kbd> simpan · <Kbd>R</Kbd> rekam ulang ·{" "}
-          <Kbd>P</Kbd> putar / jeda · <Kbd>S</Kbd> lewati
-        </p>
       </section>
     </div>
   );
